@@ -1,0 +1,134 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from './lib/supabase'
+import { currentMonthName, MONTHS } from './lib/stats'
+import MatchForm from './components/MatchForm'
+import Ranking from './components/Ranking'
+import Duos from './components/Duos'
+import Players from './components/Players'
+import './styles.css'
+
+const TABS = [
+  { id: 'match', label: '⚽ Match' },
+  { id: 'rank', label: '🏆 Classement' },
+  { id: 'duos', label: '🤝 Duos' },
+  { id: 'players', label: '👥 Joueurs' },
+]
+
+export default function App() {
+  const [tab, setTab] = useState('match')
+  const [players, setPlayers] = useState([])
+  const [matches, setMatches] = useState([])
+  const [minMatches, setMinMatches] = useState(3)
+  const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState(null)
+  const [activeMonths, setActiveMonths] = useState([])
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  const fetchAll = useCallback(async () => {
+    const [{ data: pl }, { data: mx }, { data: sx }] = await Promise.all([
+      supabase.from('players').select('name').order('created_at'),
+      supabase.from('matches').select('*').order('played_at', { ascending: false }),
+      supabase.from('settings').select('min_matches').eq('id', 1).single(),
+    ])
+    if (pl) setPlayers(pl.map(p => p.name))
+    if (mx) {
+      setMatches(mx)
+      const used = [...new Set(mx.map(m => m.month))]
+      setActiveMonths(MONTHS.filter(m => used.includes(m)))
+    }
+    if (sx) setMinMatches(sx.min_matches)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchAll()
+
+    const channel = supabase
+      .channel('realtime-all')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, fetchAll)
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [fetchAll])
+
+  const handleMinChange = async (val) => {
+    const v = Math.max(1, parseInt(val) || 1)
+    setMinMatches(v)
+    await supabase.from('settings').update({ min_matches: v }).eq('id', 1)
+  }
+
+  if (loading) return (
+    <div className="loading-screen">
+      <div className="loading-ball">⚽</div>
+      <p>Chargement...</p>
+    </div>
+  )
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-inner">
+          <span className="logo-icon">⚽</span>
+          <h1 className="app-title">Babyfoot Championship</h1>
+        </div>
+      </header>
+
+      <nav className="tab-bar">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            className={`tab-btn ${tab === t.id ? 'active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="main-content">
+        {tab === 'match' && (
+          <MatchForm
+            players={players}
+            matches={matches}
+            onToast={showToast}
+            onRefresh={fetchAll}
+          />
+        )}
+        {tab === 'rank' && (
+          <Ranking
+            players={players}
+            matches={matches}
+            minMatches={minMatches}
+            onMinChange={handleMinChange}
+            activeMonths={activeMonths}
+          />
+        )}
+        {tab === 'duos' && (
+          <Duos
+            matches={matches}
+            activeMonths={activeMonths}
+          />
+        )}
+        {tab === 'players' && (
+          <Players
+            players={players}
+            onToast={showToast}
+            onRefresh={fetchAll}
+          />
+        )}
+      </main>
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  )
+}

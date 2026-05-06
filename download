@@ -1,0 +1,65 @@
+export const MONTHS = [
+  'Janvier','Février','Mars','Avril','Mai','Juin',
+  'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
+]
+
+export function getStats(matches, player) {
+  let v = 0, d = 0, bf = 0, bc = 0
+  matches.forEach(m => {
+    const inA = m.a1 === player || m.a2 === player
+    const inB = m.b1 === player || m.b2 === player
+    if (!inA && !inB) return
+    if (inA) {
+      if (m.score_a > m.score_b) v++
+      else if (m.score_b > m.score_a) d++
+      bf += m.score_a; bc += m.score_b
+    }
+    if (inB) {
+      if (m.score_b > m.score_a) v++
+      else if (m.score_a > m.score_b) d++
+      bf += m.score_b; bc += m.score_a
+    }
+  })
+  return { v, d, played: v + d, diff: bf - bc }
+}
+
+export function buildRanking(players, matches, minMatches) {
+  const stats = players.map(p => ({ name: p, ...getStats(matches, p) }))
+  const qualified = stats
+    .filter(s => s.played >= minMatches)
+    .sort((a, b) => {
+      const ra = a.played ? a.v / a.played : 0
+      const rb = b.played ? b.v / b.played : 0
+      if (rb !== ra) return rb - ra
+      return b.diff - a.diff
+    })
+  const nc = stats
+    .filter(s => s.played < minMatches)
+    .sort((a, b) => b.played - a.played)
+  return { qualified, nc }
+}
+
+export function buildDuoStats(matches) {
+  const counts = {}
+  matches.forEach(m => {
+    const pairA = [m.a1, m.a2].sort().join('|||')
+    const pairB = [m.b1, m.b2].sort().join('|||')
+    counts[pairA] = (counts[pairA] || 0) + 1
+    counts[pairB] = (counts[pairB] || 0) + 1
+  })
+  return Object.entries(counts)
+    .map(([pair, count]) => {
+      const [p1, p2] = pair.split('|||')
+      return { p1, p2, count }
+    })
+    .sort((a, b) => b.count - a.count)
+}
+
+export function currentMonthName() {
+  return MONTHS[new Date().getMonth()]
+}
+
+export function formatRatio(v, played) {
+  if (!played) return '0%'
+  return Math.round((v / played) * 100) + '%'
+}

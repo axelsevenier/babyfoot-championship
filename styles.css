@@ -1,0 +1,134 @@
+import { useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { MONTHS, currentMonthName } from '../lib/stats'
+
+export default function MatchForm({ players, matches, onToast, onRefresh }) {
+  const [month, setMonth] = useState(currentMonthName())
+  const [a1, setA1] = useState('')
+  const [a2, setA2] = useState('')
+  const [b1, setB1] = useState('')
+  const [b2, setB2] = useState('')
+  const [sa, setSa] = useState('')
+  const [sb, setSb] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const recent = matches.slice(0, 6)
+
+  const handleSubmit = async () => {
+    if (!a1 || !a2 || !b1 || !b2) return onToast('Sélectionne les 4 joueurs', 'error')
+    if (new Set([a1, a2, b1, b2]).size < 4) return onToast('Un joueur ne peut pas jouer des deux côtés', 'error')
+    if (sa === '' || sb === '') return onToast('Entre les scores', 'error')
+    const scoreA = parseInt(sa), scoreB = parseInt(sb)
+    if (isNaN(scoreA) || isNaN(scoreB) || scoreA < 0 || scoreB < 0) return onToast('Scores invalides', 'error')
+
+    setSaving(true)
+    const { error } = await supabase.from('matches').insert({ month, a1, a2, b1, b2, score_a: scoreA, score_b: scoreB })
+    setSaving(false)
+
+    if (error) return onToast('Erreur lors de la sauvegarde', 'error')
+    setSa(''); setSb(''); setA1(''); setA2(''); setB1(''); setB2('')
+    onToast('Match enregistré !')
+    onRefresh()
+  }
+
+  const handleDelete = async (id) => {
+    await supabase.from('matches').delete().eq('id', id)
+    onRefresh()
+  }
+
+  return (
+    <div className="section">
+      <div className="card">
+        <div className="card-label">Nouveau match</div>
+
+        <div className="field">
+          <label>Mois</label>
+          <select value={month} onChange={e => setMonth(e.target.value)}>
+            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+
+        <div className="team-block">
+          <div className="team-label team-a">Équipe A</div>
+          <div className="row2">
+            <div className="field">
+              <label>Joueur 1</label>
+              <select value={a1} onChange={e => setA1(e.target.value)}>
+                <option value="">— choisir —</option>
+                {players.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Joueur 2</label>
+              <select value={a2} onChange={e => setA2(e.target.value)}>
+                <option value="">— choisir —</option>
+                {players.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="score-row">
+          <input
+            type="number" min="0" placeholder="0" value={sa}
+            onChange={e => setSa(e.target.value)}
+            className="score-input"
+          />
+          <div className="score-vs">VS</div>
+          <input
+            type="number" min="0" placeholder="0" value={sb}
+            onChange={e => setSb(e.target.value)}
+            className="score-input"
+          />
+        </div>
+
+        <div className="team-block">
+          <div className="team-label team-b">Équipe B</div>
+          <div className="row2">
+            <div className="field">
+              <label>Joueur 1</label>
+              <select value={b1} onChange={e => setB1(e.target.value)}>
+                <option value="">— choisir —</option>
+                {players.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Joueur 2</label>
+              <select value={b2} onChange={e => setB2(e.target.value)}>
+                <option value="">— choisir —</option>
+                {players.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+          {saving ? 'Enregistrement...' : 'Enregistrer le match'}
+        </button>
+      </div>
+
+      {recent.length > 0 && (
+        <div className="card">
+          <div className="card-label">Derniers matchs</div>
+          {recent.map(m => {
+            const winA = m.score_a > m.score_b
+            const winB = m.score_b > m.score_a
+            return (
+              <div key={m.id} className="match-row">
+                <div className="match-teams">
+                  <span className={winA ? 'team-winner' : 'team-loser'}>{m.a1} & {m.a2}</span>
+                  <span className="match-score">{m.score_a} — {m.score_b}</span>
+                  <span className={winB ? 'team-winner' : 'team-loser'}>{m.b1} & {m.b2}</span>
+                </div>
+                <div className="match-meta">
+                  <span>{m.month}</span>
+                  <button className="delete-btn" onClick={() => handleDelete(m.id)}>✕</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
