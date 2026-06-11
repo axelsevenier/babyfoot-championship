@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Championnat Babyfoot</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="header-title">
+        <span class="logo">⚽</span>
+        <div>
+          <h1>Championnat Babyfoot</h1>
+          <p class="season-label">Saison 2025</p>
+        </div>
+      </div>
+      <nav id="main-nav">
+        <button class="nav-btn active" data-page="general">
+          <span class="nav-icon">🏆</span><span>Classement</span>
+        </button>
+        <button class="nav-btn" data-page="saisie">
+          <span class="nav-icon">➕</span><span>Saisir</span>
+        </button>
+        <button class="nav-btn" data-page="mensuel">
+          <span class="nav-icon">📅</span><span>Mois</span>
+        </button>
+        <button class="nav-btn" data-page="matchs">
+          <span class="nav-icon">📋</span><span>Matchs</span>
+        </button>
+        <button class="nav-btn" data-page="duos">
+          <span class="nav-icon">🤝</span><span>Duos</span>
+        </button>
+        <button class="nav-btn" data-page="joueurs">
+          <span class="nav-icon">👥</span><span>Joueurs</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- PAGE CLASSEMENT GÉNÉRAL -->
+    <section id="page-general" class="page active">
+      <div class="page-header">
+        <h2>Classement général</h2>
+        <span class="page-sub">Cumul toute la saison</span>
+      </div>
+
+      <div class="podium-row" id="podium-row"></div>
+
+      <div class="card">
+        <table class="ranking-table" id="table-general">
+          <thead>
+            <tr>
+              <th class="col-rank">Rang</th>
+              <th>Joueur</th>
+              <th class="col-num">V</th>
+              <th class="col-num">D</th>
+              <th class="col-num">Matchs</th>
+              <th class="col-num">Diff.</th>
+              <th class="col-num">Ratio</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-general"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE SAISIE -->
+    <section id="page-saisie" class="page">
+      <div class="page-header">
+        <h2>Saisir un match</h2>
+        <span class="page-sub">Match 2 contre 2</span>
+      </div>
+
+      <div class="card form-card">
+        <div class="form-section">
+          <label class="form-label">Mois</label>
+          <select id="s-mois" class="form-select"></select>
+        </div>
+
+        <div class="teams-grid">
+          <div class="team-block team-a">
+            <div class="team-label">Équipe A</div>
+            <div class="form-section">
+              <label class="form-label">Joueur 1</label>
+              <select id="s-a1" class="form-select"></select>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Joueur 2</label>
+              <select id="s-a2" class="form-select"></select>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Buts</label>
+              <div class="score-input-row">
+                <button class="score-btn" onclick="adjustScore('s-ba', -1)">−</button>
+                <input type="number" id="s-ba" min="0" max="20" value="0" class="score-input">
+                <button class="score-btn" onclick="adjustScore('s-ba', 1)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="vs-divider">VS</div>
+
+          <div class="team-block team-b">
+            <div class="team-label">Équipe B</div>
+            <div class="form-section">
+              <label class="form-label">Joueur 1</label>
+              <select id="s-b1" class="form-select"></select>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Joueur 2</label>
+              <select id="s-b2" class="form-select"></select>
+            </div>
+            <div class="form-section">
+              <label class="form-label">Buts</label>
+              <div class="score-input-row">
+                <button class="score-btn" onclick="adjustScore('s-bb', -1)">−</button>
+                <input type="number" id="s-bb" min="0" max="20" value="0" class="score-input">
+                <button class="score-btn" onclick="adjustScore('s-bb', 1)">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <label class="form-label">Date (optionnel)</label>
+          <input type="date" id="s-date" class="form-input">
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveMatch()">Enregistrer le match</button>
+          <span id="s-msg" class="save-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE MENSUEL -->
+    <section id="page-mensuel" class="page">
+      <div class="page-header">
+        <h2>Classements mensuels</h2>
+        <span class="page-sub">Min. <span id="min-matchs-label">3</span> matchs pour être classé</span>
+      </div>
+
+      <div class="month-pills" id="month-pills"></div>
+
+      <div id="mensuel-content"></div>
+    </section>
+
+    <!-- PAGE MATCHS -->
+    <section id="page-matchs" class="page">
+      <div class="page-header">
+        <h2>Historique des matchs</h2>
+        <span class="page-sub" id="match-count-label"></span>
+      </div>
+
+      <div class="filters-row">
+        <select id="h-mois" class="form-select filter-select" onchange="renderHistory()">
+          <option value="">Tous les mois</option>
+        </select>
+        <select id="h-joueur" class="form-select filter-select" onchange="renderHistory()">
+          <option value="">Tous les joueurs</option>
+        </select>
+        <button class="btn btn-danger-sm" onclick="deleteLastMatch()" id="btn-delete-last">Supprimer le dernier</button>
+      </div>
+
+      <div id="history-list"></div>
+    </section>
+
+    <!-- PAGE DUOS -->
+    <section id="page-duos" class="page">
+      <div class="page-header">
+        <h2>Analyse des duos</h2>
+        <span class="page-sub">Équilibrage des coéquipiers</span>
+      </div>
+
+      <div class="filters-row">
+        <select id="duo-mois" class="form-select filter-select" onchange="renderDuos()">
+          <option value="">Toute la saison</option>
+        </select>
+      </div>
+
+      <div class="duo-stats-grid" id="duo-stats-grid"></div>
+
+      <div class="card">
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th>Duo</th>
+              <th class="col-num">Matchs</th>
+              <th class="col-num">Écart moy.</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-duos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE JOUEURS -->
+    <section id="page-joueurs" class="page">
+      <div class="page-header">
+        <h2>Joueurs</h2>
+        <span class="page-sub">Gestion de la liste</span>
+      </div>
+
+      <div class="players-grid" id="players-grid"></div>
+
+      <div class="card form-card" style="max-width:400px">
+        <h3 class="card-title">Ajouter un joueur</h3>
+        <div class="form-section">
+          <input type="text" id="new-joueur" class="form-input" placeholder="Nom du joueur" maxlength="30">
+        </div>
+        <button class="btn btn-primary" onclick="addJoueur()">Ajouter</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
