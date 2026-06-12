@@ -1,12 +1,7 @@
 'use strict';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const MOIS_NOMS = [
-  'Janvier','Février','Mars','Avril','Mai','Juin',
-  'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
-];
+const MOIS_NOMS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const MOIS_COURT = ['Jan','Fév','Mar','Avr','Mai','Juin','Jul','Août','Sep','Oct','Nov','Déc'];
-
 const FIREBASE_URL = 'https://babyfoot-championship-default-rtdb.firebaseio.com';
 
 const DEFAULT_JOUEURS = ['Alice','Axel','Mehdi','Mohamed','Thibaut'];
@@ -42,82 +37,56 @@ const DEFAULT_MATCHS = [
   {mois:5,a1:'Mohamed',a2:'Axel',b1:'Alice',b2:'Thibaut',ba:10,bb:3,date:''},
 ];
 
-// ─── State ────────────────────────────────────────────────────────────────────
 let state = { joueurs: [...DEFAULT_JOUEURS], matchs: [] };
 let activeMois = new Date().getMonth();
-let initialized = false;
+let currentSort = 'ratio';
+let sortDir = -1; // -1 = desc
+let lastMatchCount = 0;
 
-// ─── Firebase helpers ─────────────────────────────────────────────────────────
+// ─── Firebase ─────────────────────────────────────────────────────────────────
 async function fbGet(path) {
   const r = await fetch(`${FIREBASE_URL}${path}.json`);
   return r.json();
 }
-
 async function fbSet(path, data) {
-  await fetch(`${FIREBASE_URL}${path}.json`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
+  await fetch(`${FIREBASE_URL}${path}.json`, { method: 'PUT', body: JSON.stringify(data) });
 }
-
 async function fbPush(path, data) {
-  const r = await fetch(`${FIREBASE_URL}${path}.json`, {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
+  const r = await fetch(`${FIREBASE_URL}${path}.json`, { method: 'POST', body: JSON.stringify(data) });
   return r.json();
 }
-
 async function fbDelete(path) {
   await fetch(`${FIREBASE_URL}${path}.json`, { method: 'DELETE' });
 }
-
-// Écoute temps réel via SSE (Server-Sent Events Firebase)
 function fbListen(path, callback) {
   const es = new EventSource(`${FIREBASE_URL}${path}.json`);
-  es.addEventListener('put', e => {
-    const d = JSON.parse(e.data);
-    callback(d.data);
-  });
-  es.addEventListener('patch', e => {
-    const d = JSON.parse(e.data);
-    callback(null, d.data); // partial update
-  });
+  es.addEventListener('put', e => { const d = JSON.parse(e.data); callback(d.data); });
+  es.addEventListener('patch', e => { const d = JSON.parse(e.data); callback(null, d.data); });
   return es;
 }
 
-// ─── Init Firebase ────────────────────────────────────────────────────────────
+// ─── Init ─────────────────────────────────────────────────────────────────────
 async function initFirebase() {
   showLoading(true);
   try {
-    // Charger joueurs
     let joueurs = await fbGet('/joueurs');
-    if (!joueurs) {
-      await fbSet('/joueurs', DEFAULT_JOUEURS);
-      joueurs = DEFAULT_JOUEURS;
-    }
+    if (!joueurs) { await fbSet('/joueurs', DEFAULT_JOUEURS); joueurs = DEFAULT_JOUEURS; }
     state.joueurs = Array.isArray(joueurs) ? joueurs : Object.values(joueurs);
 
-    // Charger matchs
     let matchsRaw = await fbGet('/matchs');
     if (!matchsRaw) {
-      // Premier lancement : on seed les données par défaut
-      for (const m of DEFAULT_MATCHS) {
-        await fbPush('/matchs', m);
-      }
+      for (const m of DEFAULT_MATCHS) await fbPush('/matchs', m);
       matchsRaw = await fbGet('/matchs');
     }
-    state.matchs = matchsRaw ? Object.entries(matchsRaw).map(([id, m]) => ({...m, _id: id})) : [];
+    state.matchs = matchsRaw ? Object.entries(matchsRaw).map(([id,m]) => ({...m, _id: id})) : [];
+    lastMatchCount = state.matchs.length;
 
-    initialized = true;
     showLoading(false);
     renderGeneral();
     renderSaisie();
 
-    // Écoute temps réel
-    fbListen('/matchs', () => reloadMatchs());
+    fbListen('/matchs', () => reloadMatchs(true));
     fbListen('/joueurs', () => reloadJoueurs());
-
   } catch(e) {
     console.error(e);
     showLoading(false);
@@ -125,12 +94,24 @@ async function initFirebase() {
   }
 }
 
-async function reloadMatchs() {
+async function reloadMatchs(notify = false) {
   const matchsRaw = await fbGet('/matchs');
-  state.matchs = matchsRaw ? Object.entries(matchsRaw).map(([id, m]) => ({...m, _id: id})) : [];
+  state.matchs = matchsRaw ? Object.entries(matchsRaw).map(([id,m]) => ({...m, _id: id})) : [];
+
+  // Notification temps réel si nouveau match ajouté par quelqu'un d'autre
+  if (notify && state.matchs.length > lastMatchCount) {
+    const last = state.matchs[state.matchs.length - 1];
+    if (last) {
+      const winner = last.ba > last.bb ? `${last.a1} & ${last.a2}` : `${last.b1} & ${last.b2}`;
+      showNotif(`🏆 ${winner} viennent de gagner !`);
+    }
+  }
+  lastMatchCount = state.matchs.length;
+
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
   if (activePage === 'general') renderGeneral();
   if (activePage === 'mensuel') renderMensuel(activeMois);
+  if (activePage === 'palmares') renderPalmares();
   if (activePage === 'matchs') renderHistory();
   if (activePage === 'duos') renderDuos();
 }
@@ -147,46 +128,87 @@ function showLoading(show) {
   document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
 }
 
+function showNotif(msg) {
+  const el = document.getElementById('notif-banner');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 function calcStats(matchs, joueur) {
   let v = 0, d = 0, diff = 0;
   matchs.forEach(m => {
-    const inA = [m.a1, m.a2].includes(joueur);
-    const inB = [m.b1, m.b2].includes(joueur);
+    const inA = [m.a1,m.a2].includes(joueur);
+    const inB = [m.b1,m.b2].includes(joueur);
     if (!inA && !inB) return;
     const vA = m.ba > m.bb;
-    if (inA) { v += vA ? 1 : 0; d += vA ? 0 : 1; diff += (m.ba - m.bb); }
-    else      { v += vA ? 0 : 1; d += vA ? 1 : 0; diff += (m.bb - m.ba); }
+    if (inA) { v += vA?1:0; d += vA?0:1; diff += (m.ba-m.bb); }
+    else      { v += vA?0:1; d += vA?1:0; diff += (m.bb-m.ba); }
   });
   const total = v + d;
-  return { v, d, matchs: total, diff, ratio: total > 0 ? Math.round(v / total * 100) : 0 };
+  return { v, d, matchs: total, diff, ratio: total > 0 ? Math.round(v/total*100) : 0 };
 }
 
 function sortedRanking(matchs, joueurs, minMatchs = 0) {
   return joueurs
     .map(j => ({ j, ...calcStats(matchs, j) }))
     .filter(r => r.matchs >= minMatchs)
-    .sort((a, b) => b.ratio - a.ratio || b.diff - a.diff || b.v - a.v);
+    .sort((a, b) => {
+      const val = (b[currentSort] - a[currentSort]) * sortDir;
+      if (val !== 0) return val;
+      return (b.ratio - a.ratio) || (b.diff - a.diff);
+    });
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
+const PAGE_ORDER = ['general','saisie','mensuel','palmares','matchs','duos','joueurs'];
+
+function showPage(id) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const btn = document.querySelector(`.nav-btn[data-page="${id}"]`);
+  if (btn) btn.classList.add('active');
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+  renders[id] && renders[id]();
+}
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const page = btn.dataset.page;
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('page-' + page).classList.add('active');
-    renders[page] && renders[page]();
-  });
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
+
+window.showPage = showPage;
+
+// ─── Swipe ────────────────────────────────────────────────────────────────────
+let touchStartX = 0;
+const mainEl = document.getElementById('main-swipe');
+mainEl.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+mainEl.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) < 60) return;
+  const active = document.querySelector('.page.active')?.id?.replace('page-','');
+  const idx = PAGE_ORDER.indexOf(active);
+  if (dx < 0 && idx < PAGE_ORDER.length - 1) showPage(PAGE_ORDER[idx + 1]);
+  if (dx > 0 && idx > 0) showPage(PAGE_ORDER[idx - 1]);
+}, { passive: true });
+
+// ─── Tri du classement ────────────────────────────────────────────────────────
+function sortBy(col) {
+  if (currentSort === col) sortDir *= -1;
+  else { currentSort = col; sortDir = -1; }
+  document.querySelectorAll('.sortable').forEach(th => th.classList.remove('active-sort'));
+  document.querySelector(`.sortable[data-sort="${col}"]`)?.classList.add('active-sort');
+  renderGeneral();
+}
+window.sortBy = sortBy;
 
 // ─── Render: Classement général ───────────────────────────────────────────────
 function renderGeneral() {
   const rows = sortedRanking(state.matchs, state.joueurs, 0);
   const top3 = rows.slice(0, 3);
-  const medals = ['🥇', '🥈', '🥉'];
-  const rankClasses = ['rank-1', 'rank-2', 'rank-3'];
+  const medals = ['🥇','🥈','🥉'];
+  const rankClasses = ['rank-1','rank-2','rank-3'];
 
   document.getElementById('podium-row').innerHTML = top3.map((r, i) =>
     `<div class="podium-card ${rankClasses[i]}">
@@ -203,7 +225,7 @@ function renderGeneral() {
     const diffStr = r.diff > 0 ? '+' + r.diff : r.diff;
     return `<tr>
       <td class="col-rank">${medal}</td>
-      <td style="font-weight:600">${r.j}</td>
+      <td style="font-weight:600;cursor:pointer" onclick="showPlayerDetail('${r.j}')">${r.j} <span style="font-size:10px;color:#9ca3af">↗</span></td>
       <td class="col-num">${r.v}</td>
       <td class="col-num">${r.d}</td>
       <td class="col-num">${r.matchs}</td>
@@ -216,29 +238,47 @@ function renderGeneral() {
 // ─── Render: Saisie ───────────────────────────────────────────────────────────
 function renderSaisie() {
   const moisSel = document.getElementById('s-mois');
-  moisSel.innerHTML = '';
-  MOIS_NOMS.forEach((m, i) => {
-    const o = document.createElement('option');
-    o.value = i; o.textContent = m;
-    moisSel.appendChild(o);
-  });
+  moisSel.innerHTML = MOIS_NOMS.map((m,i) => `<option value="${i}">${m}</option>`).join('');
   moisSel.value = new Date().getMonth();
-
+  const opts = state.joueurs.map(j => `<option>${j}</option>`).join('');
   ['s-a1','s-a2','s-b1','s-b2'].forEach((id, idx) => {
-    const sel = document.getElementById(id);
-    sel.innerHTML = state.joueurs.map(j => `<option>${j}</option>`).join('');
-    sel.value = state.joueurs[idx] || state.joueurs[0];
+    document.getElementById(id).innerHTML = opts;
+    document.getElementById(id).value = state.joueurs[idx] || state.joueurs[0];
   });
-
   const dateEl = document.getElementById('s-date');
   if (!dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  updateWinnerPreview();
 }
 
 function adjustScore(id, delta) {
   const el = document.getElementById(id);
   el.value = Math.max(0, Math.min(20, parseInt(el.value || 0) + delta));
+  updateWinnerPreview();
 }
 window.adjustScore = adjustScore;
+
+function updateWinnerPreview() {
+  const ba = parseInt(document.getElementById('s-ba')?.value) || 0;
+  const bb = parseInt(document.getElementById('s-bb')?.value) || 0;
+  const a1 = document.getElementById('s-a1')?.value || '';
+  const a2 = document.getElementById('s-a2')?.value || '';
+  const b1 = document.getElementById('s-b1')?.value || '';
+  const b2 = document.getElementById('s-b2')?.value || '';
+  const preview = document.getElementById('winner-preview');
+  if (!preview) return;
+  if (ba === bb) {
+    preview.style.display = 'none'; return;
+  }
+  preview.style.display = 'block';
+  if (ba > bb) {
+    preview.className = 'winner-a';
+    preview.textContent = `🏆 Équipe A gagne : ${a1} & ${a2} (${ba} – ${bb})`;
+  } else {
+    preview.className = 'winner-b';
+    preview.textContent = `🏆 Équipe B gagne : ${b1} & ${b2} (${bb} – ${ba})`;
+  }
+}
+window.updateWinnerPreview = updateWinnerPreview;
 
 async function saveMatch() {
   const a1 = document.getElementById('s-a1').value;
@@ -251,28 +291,18 @@ async function saveMatch() {
   const date = document.getElementById('s-date').value;
   const msg = document.getElementById('s-msg');
 
-  if (new Set([a1, a2, b1, b2]).size < 4) {
-    msg.textContent = '⚠ 4 joueurs différents requis.';
-    msg.className = 'save-msg error'; return;
-  }
-  if (ba === bb) {
-    msg.textContent = '⚠ Pas de match nul.';
-    msg.className = 'save-msg error'; return;
-  }
+  if (new Set([a1,a2,b1,b2]).size < 4) { msg.textContent = '⚠ 4 joueurs différents requis.'; msg.className = 'save-msg error'; return; }
+  if (ba === bb) { msg.textContent = '⚠ Pas de match nul.'; msg.className = 'save-msg error'; return; }
 
   const btn = document.querySelector('#page-saisie .btn-primary');
-  btn.disabled = true;
-  btn.textContent = 'Enregistrement...';
-
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
   await fbPush('/matchs', { mois, a1, a2, b1, b2, ba, bb, date });
-  await reloadMatchs();
-
+  await reloadMatchs(false);
   document.getElementById('s-ba').value = 0;
   document.getElementById('s-bb').value = 0;
-  msg.textContent = '✓ Match enregistré !';
-  msg.className = 'save-msg';
-  btn.disabled = false;
-  btn.textContent = 'Enregistrer le match';
+  updateWinnerPreview();
+  msg.textContent = '✓ Match enregistré !'; msg.className = 'save-msg';
+  btn.disabled = false; btn.textContent = 'Enregistrer le match';
   setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 window.saveMatch = saveMatch;
@@ -280,7 +310,6 @@ window.saveMatch = saveMatch;
 // ─── Render: Mensuel ──────────────────────────────────────────────────────────
 function renderMensuel(mois) {
   if (mois !== undefined) activeMois = mois;
-
   document.getElementById('month-pills').innerHTML = MOIS_NOMS.map((m, i) => {
     const hasData = state.matchs.some(x => x.mois === i);
     return `<button class="month-pill ${i === activeMois ? 'active' : ''} ${!hasData ? 'empty' : ''}" onclick="renderMensuel(${i})">${m}</button>`;
@@ -288,11 +317,7 @@ function renderMensuel(mois) {
 
   const matchsMois = state.matchs.filter(m => m.mois === activeMois);
   const content = document.getElementById('mensuel-content');
-
-  if (!matchsMois.length) {
-    content.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Aucun match en ${MOIS_NOMS[activeMois]}.</p></div>`;
-    return;
-  }
+  if (!matchsMois.length) { content.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Aucun match en ${MOIS_NOMS[activeMois]}.</p></div>`; return; }
 
   const minM = 3;
   const ranked = sortedRanking(matchsMois, state.joueurs, minM);
@@ -307,21 +332,144 @@ function renderMensuel(mois) {
       <div class="duo-stat-card" style="flex:1;min-width:100px"><div class="duo-stat-label">Classés</div><div class="duo-stat-value">${ranked.length}</div></div>
     </div>
     <div class="card">
-      <table class="ranking-table">
-        <thead><tr><th class="col-rank">Rang</th><th>Joueur</th><th class="col-num">V</th><th class="col-num">D</th><th class="col-num">Matchs</th><th class="col-num">Diff.</th><th class="col-num">Ratio</th></tr></thead>
-        <tbody>
-          ${ranked.map((r, i) => {
-            const medal = i < 3 ? medals[i] : (i + 1);
-            const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
-            const diffStr = r.diff > 0 ? '+' + r.diff : r.diff;
-            return `<tr><td class="col-rank">${medal}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
-          }).join('')}
-          ${nonClass.length ? `<tr><td colspan="7" style="font-size:11px;color:#9ca3af;padding-top:10px">N/C (< ${minM} matchs) : ${nonClass.join(', ')}</td></tr>` : ''}
-        </tbody>
-      </table>
+      <table class="ranking-table"><thead><tr><th class="col-rank">Rang</th><th>Joueur</th><th class="col-num">V</th><th class="col-num">D</th><th class="col-num">Matchs</th><th class="col-num">Diff.</th><th class="col-num">Ratio</th></tr></thead>
+      <tbody>
+        ${ranked.map((r, i) => {
+          const medal = i < 3 ? medals[i] : (i+1);
+          const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
+          const diffStr = r.diff > 0 ? '+'+r.diff : r.diff;
+          return `<tr><td class="col-rank">${medal}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
+        }).join('')}
+        ${nonClass.length ? `<tr><td colspan="7" style="font-size:11px;color:#9ca3af;padding-top:10px">N/C (< ${minM} matchs) : ${nonClass.join(', ')}</td></tr>` : ''}
+      </tbody></table>
     </div>`;
 }
 window.renderMensuel = renderMensuel;
+
+// ─── Render: Palmarès ────────────────────────────────────────────────────────
+function renderPalmares() {
+  const content = document.getElementById('palmares-content');
+  const moisAvecData = [...new Set(state.matchs.map(m => m.mois))].sort((a,b) => a-b);
+
+  if (!moisAvecData.length) {
+    content.innerHTML = '<div class="empty-state"><div class="empty-icon">🎖️</div><p>Aucune donnée.</p></div>';
+    return;
+  }
+
+  // Titres mensuels
+  const titresHTML = moisAvecData.map(mois => {
+    const matchsMois = state.matchs.filter(m => m.mois === mois);
+    const ranked = sortedRanking(matchsMois, state.joueurs, 3);
+    if (!ranked.length) return '';
+    const winner = ranked[0];
+    return `<div class="palmares-month-card">
+      <span style="font-size:24px">🥇</span>
+      <div>
+        <div class="palmares-mois">${MOIS_NOMS[mois]}</div>
+        <div class="palmares-winner">${winner.j}</div>
+        <div class="palmares-stats">${winner.v}V · ${winner.d}D · ${winner.ratio}% de réussite</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Stats par joueur avec évolution mensuelle
+  const joueursHTML = state.joueurs.map(j => {
+    const globalStats = calcStats(state.matchs, j);
+    const monthlyRatios = moisAvecData.map(mois => {
+      const mm = state.matchs.filter(m => m.mois === mois);
+      const s = calcStats(mm, j);
+      return { mois, ...s };
+    }).filter(s => s.matchs > 0);
+
+    const meilleurDuo = getBestDuo(j);
+    const pireAdversaire = getWorstOpponent(j);
+
+    const ratiosBars = monthlyRatios.map(s =>
+      `<div class="month-ratio-row">
+        <span class="month-ratio-label">${MOIS_COURT[s.mois]}</span>
+        <div style="flex:1"><div class="ratio-bar-wrap"><div class="ratio-bar" style="width:${s.ratio}%"></div></div></div>
+        <span class="month-ratio-val">${s.ratio}%</span>
+      </div>`
+    ).join('');
+
+    return `<div class="player-detail-card">
+      <div class="player-detail-header" onclick="togglePlayerDetail('pd-${j}')">
+        <div class="player-avatar" style="width:38px;height:38px;border-radius:50%;background:#dcfce7;color:#14532d;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${j.slice(0,2).toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:15px">${j}</div>
+          <div style="font-size:12px;color:#6b7280">${globalStats.v}V · ${globalStats.d}D · ${globalStats.ratio}% sur la saison</div>
+        </div>
+        <span style="color:#9ca3af;font-size:18px">▸</span>
+      </div>
+      <div class="player-detail-body" id="pd-${j}">
+        <div style="margin-bottom:1rem">
+          <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Évolution mensuelle</div>
+          ${ratiosBars || '<p style="font-size:12px;color:#9ca3af">Pas assez de données.</p>'}
+        </div>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+          ${meilleurDuo ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Meilleur duo</div><div style="font-size:15px;font-weight:700">${meilleurDuo.j} <span style="font-size:12px;color:#6b7280">(${meilleurDuo.ratio}%)</span></div></div>` : ''}
+          ${pireAdversaire ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Adversaire difficile</div><div style="font-size:15px;font-weight:700">${pireAdversaire.j} <span style="font-size:12px;color:#6b7280">(${pireAdversaire.ratio}%)</span></div></div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div style="margin-bottom:1.5rem">
+      <h3 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Vainqueurs mensuels</h3>
+      ${titresHTML || '<p style="color:#9ca3af;font-size:13px">Pas encore de données.</p>'}
+    </div>
+    <div>
+      <h3 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Fiche par joueur</h3>
+      ${joueursHTML}
+    </div>`;
+}
+
+function togglePlayerDetail(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+window.togglePlayerDetail = togglePlayerDetail;
+
+function getBestDuo(joueur) {
+  const partners = state.joueurs.filter(j => j !== joueur);
+  let best = null;
+  partners.forEach(p => {
+    const together = state.matchs.filter(m =>
+      ([m.a1,m.a2].includes(joueur) && [m.a1,m.a2].includes(p)) ||
+      ([m.b1,m.b2].includes(joueur) && [m.b1,m.b2].includes(p))
+    );
+    if (together.length < 2) return;
+    const s = calcStats(together, joueur);
+    if (!best || s.ratio > best.ratio) best = { j: p, ratio: s.ratio };
+  });
+  return best;
+}
+
+function getWorstOpponent(joueur) {
+  const opponents = state.joueurs.filter(j => j !== joueur);
+  let worst = null;
+  opponents.forEach(o => {
+    const vsMatches = state.matchs.filter(m => {
+      const joueurInA = [m.a1,m.a2].includes(joueur);
+      const opponentInA = [m.a1,m.a2].includes(o);
+      return joueurInA !== opponentInA;
+    });
+    if (vsMatches.length < 2) return;
+    const s = calcStats(vsMatches, joueur);
+    if (!worst || s.ratio < worst.ratio) worst = { j: o, ratio: s.ratio };
+  });
+  return worst;
+}
+
+function showPlayerDetail(joueur) {
+  showPage('palmares');
+  setTimeout(() => {
+    const el = document.getElementById(`pd-${joueur}`);
+    if (el) { el.classList.add('open'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }, 100);
+}
+window.showPlayerDetail = showPlayerDetail;
 
 // ─── Render: Historique ───────────────────────────────────────────────────────
 function renderHistory() {
@@ -353,10 +501,7 @@ function renderHistory() {
   document.getElementById('match-count-label').textContent = matchs.length + ' match' + (matchs.length > 1 ? 's' : '');
 
   const el = document.getElementById('history-list');
-  if (!matchs.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>Aucun match trouvé.</p></div>`;
-    return;
-  }
+  if (!matchs.length) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>Aucun match trouvé.</p></div>`; return; }
 
   el.innerHTML = matchs.map(m => {
     const vA = m.ba > m.bb;
@@ -365,8 +510,8 @@ function renderHistory() {
     const scoreB = !vA ? `<strong>${m.bb}</strong>` : m.bb;
     const actions = m._id ? `
       <div style="display:flex;gap:4px;margin-left:auto">
-        <button onclick="openEditModal('${m._id}')" style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:500" title="Modifier">✏️ Modifier</button>
-        <button onclick="deleteMatch('${m._id}')" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer" title="Supprimer">×</button>
+        <button onclick="openEditModal('${m._id}')" style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:500">✏️ Modifier</button>
+        <button onclick="deleteMatch('${m._id}')" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer">×</button>
       </div>` : '';
     return `<div class="match-card">
       <span class="match-month">${MOIS_COURT[m.mois]}</span>
@@ -387,28 +532,21 @@ window.renderHistory = renderHistory;
 async function deleteMatch(id) {
   if (!confirm('Supprimer ce match ?')) return;
   await fbDelete(`/matchs/${id}`);
-  await reloadMatchs();
+  await reloadMatchs(false);
 }
 window.deleteMatch = deleteMatch;
 
 // ─── Modal modification ────────────────────────────────────────────────────────
 let editingId = null;
-
 function openEditModal(id) {
   const m = state.matchs.find(x => x._id === id);
   if (!m) return;
   editingId = id;
-
-  // Remplir le select mois
   const moisSel = document.getElementById('e-mois');
-  moisSel.innerHTML = MOIS_NOMS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  moisSel.innerHTML = MOIS_NOMS.map((n,i) => `<option value="${i}">${n}</option>`).join('');
   moisSel.value = m.mois;
-
-  // Remplir les selects joueurs
   const opts = state.joueurs.map(j => `<option>${j}</option>`).join('');
-  ['e-a1','e-a2','e-b1','e-b2'].forEach(id => {
-    document.getElementById(id).innerHTML = opts;
-  });
+  ['e-a1','e-a2','e-b1','e-b2'].forEach(id => { document.getElementById(id).innerHTML = opts; });
   document.getElementById('e-a1').value = m.a1;
   document.getElementById('e-a2').value = m.a2;
   document.getElementById('e-b1').value = m.b1;
@@ -417,18 +555,15 @@ function openEditModal(id) {
   document.getElementById('e-bb').value = m.bb;
   document.getElementById('e-date').value = m.date || '';
   document.getElementById('e-msg').textContent = '';
-
   const modal = document.getElementById('edit-modal');
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
-
 function closeEditModal() {
   document.getElementById('edit-modal').style.display = 'none';
   document.body.style.overflow = '';
   editingId = null;
 }
-
 async function saveEditMatch() {
   const a1 = document.getElementById('e-a1').value;
   const a2 = document.getElementById('e-a2').value;
@@ -439,39 +574,23 @@ async function saveEditMatch() {
   const mois = parseInt(document.getElementById('e-mois').value);
   const date = document.getElementById('e-date').value;
   const msg = document.getElementById('e-msg');
-
-  if (new Set([a1, a2, b1, b2]).size < 4) {
-    msg.textContent = '⚠ 4 joueurs différents requis.';
-    msg.className = 'save-msg error'; return;
-  }
-  if (ba === bb) {
-    msg.textContent = '⚠ Pas de match nul.';
-    msg.className = 'save-msg error'; return;
-  }
-
+  if (new Set([a1,a2,b1,b2]).size < 4) { msg.textContent = '⚠ 4 joueurs différents requis.'; msg.className = 'save-msg error'; return; }
+  if (ba === bb) { msg.textContent = '⚠ Pas de match nul.'; msg.className = 'save-msg error'; return; }
   const btn = document.getElementById('e-save-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
-
   await fbSet(`/matchs/${editingId}`, { mois, a1, a2, b1, b2, ba, bb, date });
-  await reloadMatchs();
-
+  await reloadMatchs(false);
   btn.disabled = false; btn.textContent = 'Enregistrer';
   closeEditModal();
 }
-
+document.getElementById('edit-modal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
 window.openEditModal = openEditModal;
 window.closeEditModal = closeEditModal;
 window.saveEditMatch = saveEditMatch;
 
-// Fermer la modal en cliquant à l'extérieur
-document.getElementById('edit-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeEditModal();
-});
-
 // ─── Render: Duos ─────────────────────────────────────────────────────────────
 function renderDuos() {
   const moisFilter = document.getElementById('duo-mois').value;
-
   const ds = document.getElementById('duo-mois');
   ds.innerHTML = '<option value="">Toute la saison</option>';
   MOIS_NOMS.forEach((m, i) => {
@@ -488,23 +607,23 @@ function renderDuos() {
   const joueurs = state.joueurs;
   const duos = [];
   for (let i = 0; i < joueurs.length; i++) {
-    for (let k = i + 1; k < joueurs.length; k++) {
+    for (let k = i+1; k < joueurs.length; k++) {
       const j1 = joueurs[i], j2 = joueurs[k];
       const together = matchs.filter(m =>
         ([m.a1,m.a2].includes(j1) && [m.a1,m.a2].includes(j2)) ||
         ([m.b1,m.b2].includes(j1) && [m.b1,m.b2].includes(j2))
       );
       const n = together.length;
-      const avgPerDuo = joueurs.length > 1 ? matchs.length / (joueurs.length - 1) : 0;
+      const avgPerDuo = joueurs.length > 1 ? matchs.length / (joueurs.length-1) : 0;
       const ecart = Math.round((n - avgPerDuo) * 10) / 10;
       duos.push({ j1, j2, n, ecart });
     }
   }
-  duos.sort((a, b) => a.n - b.n);
+  duos.sort((a,b) => a.n - b.n);
 
   const totalDuos = duos.length;
   const duos0 = duos.filter(d => d.n === 0).length;
-  const avgMatchs = totalDuos > 0 ? Math.round(duos.reduce((s,d) => s+d.n, 0) / totalDuos * 10) / 10 : 0;
+  const avgMatchs = totalDuos > 0 ? Math.round(duos.reduce((s,d) => s+d.n, 0)/totalDuos*10)/10 : 0;
 
   document.getElementById('duo-stats-grid').innerHTML = `
     <div class="duo-stat-card"><div class="duo-stat-label">Total duos</div><div class="duo-stat-value">${totalDuos}</div></div>
@@ -512,9 +631,7 @@ function renderDuos() {
     <div class="duo-stat-card"><div class="duo-stat-label">Moy. matchs/duo</div><div class="duo-stat-value">${avgMatchs}</div></div>`;
 
   document.getElementById('tbody-duos').innerHTML = duos.map(d => {
-    const prio = d.n === 0
-      ? `<span class="badge-urgent">URGENT</span>`
-      : d.ecart < -0.5 ? `<span class="badge-rattraper">Rattraper</span>` : '—';
+    const prio = d.n === 0 ? `<span class="badge-urgent">URGENT</span>` : d.ecart < -0.5 ? `<span class="badge-rattraper">Rattraper</span>` : '—';
     return `<tr><td><strong>${d.j1}</strong> & <strong>${d.j2}</strong></td><td class="col-num">${d.n}</td><td class="col-num">${d.ecart>0?'+':''}${d.ecart}</td><td>${prio}</td></tr>`;
   }).join('');
 }
@@ -524,9 +641,8 @@ window.renderDuos = renderDuos;
 function renderJoueurs() {
   document.getElementById('players-grid').innerHTML = state.joueurs.map((j, i) => {
     const stats = calcStats(state.matchs, j);
-    const initials = j.slice(0, 2).toUpperCase();
     return `<div class="player-card">
-      <div class="player-avatar">${initials}</div>
+      <div class="player-avatar">${j.slice(0,2).toUpperCase()}</div>
       <div class="player-info">
         <div class="player-name">${j}</div>
         <div class="player-matchs">${stats.matchs} matchs · ${stats.ratio}%</div>
@@ -544,19 +660,15 @@ async function addJoueur() {
   state.joueurs.push(nom);
   await fbSet('/joueurs', state.joueurs);
   inp.value = '';
-  renderJoueurs();
-  renderSaisie();
+  renderJoueurs(); renderSaisie();
 }
-
 async function removeJoueur(i) {
   const nom = state.joueurs[i];
   if (!confirm(`Retirer ${nom} ?`)) return;
   state.joueurs.splice(i, 1);
   await fbSet('/joueurs', state.joueurs);
-  renderJoueurs();
-  renderSaisie();
+  renderJoueurs(); renderSaisie();
 }
-
 window.addJoueur = addJoueur;
 window.removeJoueur = removeJoueur;
 
@@ -565,6 +677,7 @@ const renders = {
   general: renderGeneral,
   saisie: renderSaisie,
   mensuel: () => renderMensuel(activeMois),
+  palmares: renderPalmares,
   matchs: renderHistory,
   duos: renderDuos,
   joueurs: renderJoueurs,
