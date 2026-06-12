@@ -40,7 +40,7 @@ const DEFAULT_MATCHS = [
 let state = { joueurs: [...DEFAULT_JOUEURS], matchs: [] };
 let activeMois = new Date().getMonth();
 let currentSort = 'ratio';
-let sortDir = -1; // -1 = desc
+let sortDir = 1; // 1 = desc (b-a), -1 = asc
 let lastMatchCount = 0;
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ mainEl.addEventListener('touchend', e => {
 // ─── Tri du classement ────────────────────────────────────────────────────────
 function sortBy(col) {
   if (currentSort === col) sortDir *= -1;
-  else { currentSort = col; sortDir = -1; }
+  else { currentSort = col; sortDir = 1; }
   document.querySelectorAll('.sortable').forEach(th => th.classList.remove('active-sort'));
   document.querySelector(`.sortable[data-sort="${col}"]`)?.classList.add('active-sort');
   renderGeneral();
