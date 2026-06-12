@@ -40,7 +40,18 @@
     </div>
   </header>
 
-  <main>
+  
+  <!-- LOADING OVERLAY -->
+  <div id="loading-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1rem">
+    <div style="font-size:36px">⚽</div>
+    <div style="color:#fff;font-size:16px;font-weight:500">Chargement des données...</div>
+    <div style="color:#9ca3af;font-size:13px">Connexion à Firebase</div>
+  </div>
+  <div id="loading-error" style="display:none;position:fixed;bottom:20px;right:20px;background:#dc2626;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px">
+    ⚠ Impossible de se connecter à la base de données.
+  </div>
+
+<main>
     <!-- PAGE CLASSEMENT GÉNÉRAL -->
     <section id="page-general" class="page active">
       <div class="page-header">
