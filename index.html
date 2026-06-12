@@ -8,6 +8,48 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+  <!-- ÉCRAN MOT DE PASSE -->
+  <div id="password-screen" style="position:fixed;inset:0;background:#111827;z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#1f2937;border:1px solid #374151;border-radius:14px;padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center">
+      <div style="font-size:48px;margin-bottom:1rem">⚽</div>
+      <h1 style="color:#fff;font-size:20px;font-weight:700;margin-bottom:6px">Championnat Babyfoot</h1>
+      <p style="color:#9ca3af;font-size:13px;margin-bottom:2rem">Entrez le mot de passe pour accéder au site</p>
+      <input type="password" id="pwd-input" placeholder="Mot de passe"
+        style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #374151;background:#111827;color:#fff;font-size:15px;text-align:center;outline:none;margin-bottom:.75rem"
+        onkeydown="if(event.key==='Enter')checkPassword()">
+      <button onclick="checkPassword()"
+        style="width:100%;padding:11px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">
+        Accéder
+      </button>
+      <p id="pwd-error" style="color:#f87171;font-size:13px;margin-top:.75rem;display:none">Mot de passe incorrect.</p>
+    </div>
+  </div>
+
+  <script>
+    const PASSWORD_HASH = 'b9ae62ede2dad179198540d5a84bf5e432f8f36c370d906b9a8224d04582d9d0';
+    async function checkPassword() {
+      const val = document.getElementById('pwd-input').value;
+      const enc = new TextEncoder().encode(val);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+      if (hash === PASSWORD_HASH) {
+        document.getElementById('password-screen').style.display = 'none';
+        sessionStorage.setItem('bf_auth', '1');
+      } else {
+        document.getElementById('pwd-error').style.display = 'block';
+        document.getElementById('pwd-input').value = '';
+        document.getElementById('pwd-input').focus();
+      }
+    }
+    // Déjà authentifié dans cette session ?
+    if (sessionStorage.getItem('bf_auth') === '1') {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('password-screen').style.display = 'none';
+      });
+    }
+  </script>
+
   <header>
     <div class="header-inner">
       <div class="header-title">
