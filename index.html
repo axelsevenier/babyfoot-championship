@@ -42,7 +42,6 @@
         document.getElementById('pwd-input').focus();
       }
     }
-    // Déjà authentifié dans cette session ?
     if (sessionStorage.getItem('bf_auth') === '1') {
       document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('password-screen').style.display = 'none';
@@ -56,34 +55,21 @@
         <span class="logo">⚽</span>
         <div>
           <h1>Championnat Babyfoot</h1>
-          <p class="season-label">Saison 2025</p>
+          <p class="season-label" id="season-label">Saison 2026</p>
         </div>
       </div>
       <nav id="main-nav">
-        <button class="nav-btn active" data-page="general">
-          <span class="nav-icon">🏆</span><span>Classement</span>
-        </button>
-        <button class="nav-btn" data-page="saisie">
-          <span class="nav-icon">➕</span><span>Saisir</span>
-        </button>
-        <button class="nav-btn" data-page="mensuel">
-          <span class="nav-icon">📅</span><span>Mois</span>
-        </button>
-        <button class="nav-btn" data-page="matchs">
-          <span class="nav-icon">📋</span><span>Matchs</span>
-        </button>
-        <button class="nav-btn" data-page="duos">
-          <span class="nav-icon">🤝</span><span>Duos</span>
-        </button>
-        <button class="nav-btn" data-page="joueurs">
-          <span class="nav-icon">👥</span><span>Joueurs</span>
-        </button>
+        <button class="nav-btn active" data-page="general"><span class="nav-icon">🏆</span><span>Classement</span></button>
+        <button class="nav-btn" data-page="saisie"><span class="nav-icon">➕</span><span>Saisir</span></button>
+        <button class="nav-btn" data-page="mensuel"><span class="nav-icon">📅</span><span>Mois</span></button>
+        <button class="nav-btn" data-page="palmares"><span class="nav-icon">🎖️</span><span>Palmarès</span></button>
+        <button class="nav-btn" data-page="matchs"><span class="nav-icon">📋</span><span>Matchs</span></button>
+        <button class="nav-btn" data-page="duos"><span class="nav-icon">🤝</span><span>Duos</span></button>
+        <button class="nav-btn" data-page="joueurs"><span class="nav-icon">👥</span><span>Joueurs</span></button>
       </nav>
     </div>
   </header>
 
-  
-  <!-- LOADING OVERLAY -->
   <div id="loading-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1rem">
     <div style="font-size:36px">⚽</div>
     <div style="color:#fff;font-size:16px;font-weight:500">Chargement des données...</div>
@@ -93,27 +79,30 @@
     ⚠ Impossible de se connecter à la base de données.
   </div>
 
-<main>
+  <!-- NOTIFICATION TEMPS RÉEL -->
+  <div id="notif-banner" style="display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:500;z-index:800;box-shadow:0 4px 12px rgba(0,0,0,.3);white-space:nowrap"></div>
+
+  <main id="main-swipe">
+
     <!-- PAGE CLASSEMENT GÉNÉRAL -->
     <section id="page-general" class="page active">
       <div class="page-header">
         <h2>Classement général</h2>
         <span class="page-sub">Cumul toute la saison</span>
+        <button class="btn btn-primary" onclick="showPage('saisie')" style="margin-left:auto;padding:7px 16px;font-size:13px">➕ Match</button>
       </div>
-
       <div class="podium-row" id="podium-row"></div>
-
       <div class="card">
         <table class="ranking-table" id="table-general">
           <thead>
             <tr>
               <th class="col-rank">Rang</th>
               <th>Joueur</th>
-              <th class="col-num">V</th>
-              <th class="col-num">D</th>
-              <th class="col-num">Matchs</th>
-              <th class="col-num">Diff.</th>
-              <th class="col-num">Ratio</th>
+              <th class="col-num sortable" data-sort="v" onclick="sortBy('v')">V ↕</th>
+              <th class="col-num sortable" data-sort="d" onclick="sortBy('d')">D ↕</th>
+              <th class="col-num sortable" data-sort="matchs" onclick="sortBy('matchs')">Matchs ↕</th>
+              <th class="col-num sortable" data-sort="diff" onclick="sortBy('diff')">Diff. ↕</th>
+              <th class="col-num sortable active-sort" data-sort="ratio" onclick="sortBy('ratio')">Ratio ↕</th>
             </tr>
           </thead>
           <tbody id="tbody-general"></tbody>
@@ -127,62 +116,45 @@
         <h2>Saisir un match</h2>
         <span class="page-sub">Match 2 contre 2</span>
       </div>
-
       <div class="card form-card">
         <div class="form-section">
           <label class="form-label">Mois</label>
           <select id="s-mois" class="form-select"></select>
         </div>
-
-        <div class="teams-grid">
-          <div class="team-block team-a">
+        <div class="teams-grid" id="saisie-teams-grid">
+          <div class="team-block team-a" id="saisie-team-a">
             <div class="team-label">Équipe A</div>
-            <div class="form-section">
-              <label class="form-label">Joueur 1</label>
-              <select id="s-a1" class="form-select"></select>
-            </div>
-            <div class="form-section">
-              <label class="form-label">Joueur 2</label>
-              <select id="s-a2" class="form-select"></select>
-            </div>
+            <div class="form-section"><label class="form-label">Joueur 1</label><select id="s-a1" class="form-select" onchange="updateWinnerPreview()"></select></div>
+            <div class="form-section"><label class="form-label">Joueur 2</label><select id="s-a2" class="form-select" onchange="updateWinnerPreview()"></select></div>
             <div class="form-section">
               <label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('s-ba', -1)">−</button>
-                <input type="number" id="s-ba" min="0" max="20" value="0" class="score-input">
-                <button class="score-btn" onclick="adjustScore('s-ba', 1)">+</button>
+                <button class="score-btn" onclick="adjustScore('s-ba',-1)">−</button>
+                <input type="number" id="s-ba" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
+                <button class="score-btn" onclick="adjustScore('s-ba',1)">+</button>
               </div>
             </div>
           </div>
-
           <div class="vs-divider">VS</div>
-
-          <div class="team-block team-b">
+          <div class="team-block team-b" id="saisie-team-b">
             <div class="team-label">Équipe B</div>
-            <div class="form-section">
-              <label class="form-label">Joueur 1</label>
-              <select id="s-b1" class="form-select"></select>
-            </div>
-            <div class="form-section">
-              <label class="form-label">Joueur 2</label>
-              <select id="s-b2" class="form-select"></select>
-            </div>
+            <div class="form-section"><label class="form-label">Joueur 1</label><select id="s-b1" class="form-select" onchange="updateWinnerPreview()"></select></div>
+            <div class="form-section"><label class="form-label">Joueur 2</label><select id="s-b2" class="form-select" onchange="updateWinnerPreview()"></select></div>
             <div class="form-section">
               <label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('s-bb', -1)">−</button>
-                <input type="number" id="s-bb" min="0" max="20" value="0" class="score-input">
-                <button class="score-btn" onclick="adjustScore('s-bb', 1)">+</button>
+                <button class="score-btn" onclick="adjustScore('s-bb',-1)">−</button>
+                <input type="number" id="s-bb" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
+                <button class="score-btn" onclick="adjustScore('s-bb',1)">+</button>
               </div>
             </div>
           </div>
         </div>
-
+        <div id="winner-preview" style="display:none;margin:.5rem 0 1rem;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;transition:all .2s"></div>
         <div class="form-section">
           <label class="form-label">Date (optionnel)</label>
           <input type="date" id="s-date" class="form-input">
         </div>
-
         <div class="form-actions">
           <button class="btn btn-primary" onclick="saveMatch()">Enregistrer le match</button>
           <span id="s-msg" class="save-msg"></span>
@@ -194,12 +166,19 @@
     <section id="page-mensuel" class="page">
       <div class="page-header">
         <h2>Classements mensuels</h2>
-        <span class="page-sub">Min. <span id="min-matchs-label">3</span> matchs pour être classé</span>
+        <span class="page-sub">Min. 3 matchs pour être classé</span>
       </div>
-
       <div class="month-pills" id="month-pills"></div>
-
       <div id="mensuel-content"></div>
+    </section>
+
+    <!-- PAGE PALMARÈS -->
+    <section id="page-palmares" class="page">
+      <div class="page-header">
+        <h2>Palmarès</h2>
+        <span class="page-sub">Vainqueurs mensuels & stats joueurs</span>
+      </div>
+      <div id="palmares-content"></div>
     </section>
 
     <!-- PAGE MATCHS -->
@@ -208,17 +187,10 @@
         <h2>Historique des matchs</h2>
         <span class="page-sub" id="match-count-label"></span>
       </div>
-
       <div class="filters-row">
-        <select id="h-mois" class="form-select filter-select" onchange="renderHistory()">
-          <option value="">Tous les mois</option>
-        </select>
-        <select id="h-joueur" class="form-select filter-select" onchange="renderHistory()">
-          <option value="">Tous les joueurs</option>
-        </select>
-        <button class="btn btn-danger-sm" onclick="deleteLastMatch()" id="btn-delete-last">Supprimer le dernier</button>
+        <select id="h-mois" class="form-select filter-select" onchange="renderHistory()"><option value="">Tous les mois</option></select>
+        <select id="h-joueur" class="form-select filter-select" onchange="renderHistory()"><option value="">Tous les joueurs</option></select>
       </div>
-
       <div id="history-list"></div>
     </section>
 
@@ -228,25 +200,13 @@
         <h2>Analyse des duos</h2>
         <span class="page-sub">Équilibrage des coéquipiers</span>
       </div>
-
       <div class="filters-row">
-        <select id="duo-mois" class="form-select filter-select" onchange="renderDuos()">
-          <option value="">Toute la saison</option>
-        </select>
+        <select id="duo-mois" class="form-select filter-select" onchange="renderDuos()"><option value="">Toute la saison</option></select>
       </div>
-
       <div class="duo-stats-grid" id="duo-stats-grid"></div>
-
       <div class="card">
         <table class="ranking-table">
-          <thead>
-            <tr>
-              <th>Duo</th>
-              <th class="col-num">Matchs</th>
-              <th class="col-num">Écart moy.</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Duo</th><th class="col-num">Matchs</th><th class="col-num">Écart moy.</th><th>Statut</th></tr></thead>
           <tbody id="tbody-duos"></tbody>
         </table>
       </div>
@@ -258,9 +218,7 @@
         <h2>Joueurs</h2>
         <span class="page-sub">Gestion de la liste</span>
       </div>
-
       <div class="players-grid" id="players-grid"></div>
-
       <div class="card form-card" style="max-width:400px">
         <h3 class="card-title">Ajouter un joueur</h3>
         <div class="form-section">
@@ -269,6 +227,7 @@
         <button class="btn btn-primary" onclick="addJoueur()">Ajouter</button>
       </div>
     </section>
+
   </main>
 
   <!-- MODAL MODIFICATION MATCH -->
@@ -278,25 +237,13 @@
         <h2 style="font-size:17px;font-weight:700">Modifier le match</h2>
         <button onclick="closeEditModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;padding:2px 6px">×</button>
       </div>
-
-      <div class="form-section">
-        <label class="form-label">Mois</label>
-        <select id="e-mois" class="form-select"></select>
-      </div>
-
+      <div class="form-section"><label class="form-label">Mois</label><select id="e-mois" class="form-select"></select></div>
       <div class="teams-grid">
         <div class="team-block team-a">
           <div class="team-label">Équipe A</div>
-          <div class="form-section">
-            <label class="form-label">Joueur 1</label>
-            <select id="e-a1" class="form-select"></select>
-          </div>
-          <div class="form-section">
-            <label class="form-label">Joueur 2</label>
-            <select id="e-a2" class="form-select"></select>
-          </div>
-          <div class="form-section">
-            <label class="form-label">Buts</label>
+          <div class="form-section"><label class="form-label">Joueur 1</label><select id="e-a1" class="form-select"></select></div>
+          <div class="form-section"><label class="form-label">Joueur 2</label><select id="e-a2" class="form-select"></select></div>
+          <div class="form-section"><label class="form-label">Buts</label>
             <div class="score-input-row">
               <button class="score-btn" onclick="adjustScore('e-ba',-1)">−</button>
               <input type="number" id="e-ba" min="0" max="20" class="score-input">
@@ -304,21 +251,12 @@
             </div>
           </div>
         </div>
-
         <div class="vs-divider">VS</div>
-
         <div class="team-block team-b">
           <div class="team-label">Équipe B</div>
-          <div class="form-section">
-            <label class="form-label">Joueur 1</label>
-            <select id="e-b1" class="form-select"></select>
-          </div>
-          <div class="form-section">
-            <label class="form-label">Joueur 2</label>
-            <select id="e-b2" class="form-select"></select>
-          </div>
-          <div class="form-section">
-            <label class="form-label">Buts</label>
+          <div class="form-section"><label class="form-label">Joueur 1</label><select id="e-b1" class="form-select"></select></div>
+          <div class="form-section"><label class="form-label">Joueur 2</label><select id="e-b2" class="form-select"></select></div>
+          <div class="form-section"><label class="form-label">Buts</label>
             <div class="score-input-row">
               <button class="score-btn" onclick="adjustScore('e-bb',-1)">−</button>
               <input type="number" id="e-bb" min="0" max="20" class="score-input">
@@ -327,12 +265,7 @@
           </div>
         </div>
       </div>
-
-      <div class="form-section">
-        <label class="form-label">Date (optionnel)</label>
-        <input type="date" id="e-date" class="form-input">
-      </div>
-
+      <div class="form-section"><label class="form-label">Date (optionnel)</label><input type="date" id="e-date" class="form-input"></div>
       <div style="display:flex;gap:.75rem;margin-top:1rem">
         <button class="btn btn-primary" onclick="saveEditMatch()" id="e-save-btn" style="flex:1">Enregistrer</button>
         <button class="btn" onclick="closeEditModal()" style="border:1px solid #d1d5db">Annuler</button>
