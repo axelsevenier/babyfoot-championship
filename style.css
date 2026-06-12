@@ -684,3 +684,35 @@ main {
 /* Notification */
 #notif-banner { animation: slideDown .3s ease; }
 @keyframes slideDown { from { opacity:0; transform: translateX(-50%) translateY(-10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+/* ─── Mode switcher 2v2 / 1v1 ───────────────────────────────────────────── */
+.mode-switcher {
+  display: flex;
+  background: rgba(255,255,255,.1);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--gray-400);
+  transition: all .15s;
+}
+.mode-btn.active {
+  background: #fff;
+  color: var(--gray-900);
+}
+.mode-banner {
+  text-align: center;
+  font-size: 12px;
+  padding: 6px;
+  font-weight: 500;
+}
+.mode-banner-2v2 { background: #dbeafe; color: #1e40af; }
+.mode-banner-1v1 { background: #fce7f3; color: #9d174d; }
