@@ -229,6 +229,76 @@
     </section>
   </main>
 
+  <!-- MODAL MODIFICATION MATCH -->
+  <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+        <h2 style="font-size:17px;font-weight:700">Modifier le match</h2>
+        <button onclick="closeEditModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;padding:2px 6px">×</button>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">Mois</label>
+        <select id="e-mois" class="form-select"></select>
+      </div>
+
+      <div class="teams-grid">
+        <div class="team-block team-a">
+          <div class="team-label">Équipe A</div>
+          <div class="form-section">
+            <label class="form-label">Joueur 1</label>
+            <select id="e-a1" class="form-select"></select>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Joueur 2</label>
+            <select id="e-a2" class="form-select"></select>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Buts</label>
+            <div class="score-input-row">
+              <button class="score-btn" onclick="adjustScore('e-ba',-1)">−</button>
+              <input type="number" id="e-ba" min="0" max="20" class="score-input">
+              <button class="score-btn" onclick="adjustScore('e-ba',1)">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="vs-divider">VS</div>
+
+        <div class="team-block team-b">
+          <div class="team-label">Équipe B</div>
+          <div class="form-section">
+            <label class="form-label">Joueur 1</label>
+            <select id="e-b1" class="form-select"></select>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Joueur 2</label>
+            <select id="e-b2" class="form-select"></select>
+          </div>
+          <div class="form-section">
+            <label class="form-label">Buts</label>
+            <div class="score-input-row">
+              <button class="score-btn" onclick="adjustScore('e-bb',-1)">−</button>
+              <input type="number" id="e-bb" min="0" max="20" class="score-input">
+              <button class="score-btn" onclick="adjustScore('e-bb',1)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">Date (optionnel)</label>
+        <input type="date" id="e-date" class="form-input">
+      </div>
+
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button class="btn btn-primary" onclick="saveEditMatch()" id="e-save-btn" style="flex:1">Enregistrer</button>
+        <button class="btn" onclick="closeEditModal()" style="border:1px solid #d1d5db">Annuler</button>
+      </div>
+      <span id="e-msg" class="save-msg" style="display:block;margin-top:.5rem"></span>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
