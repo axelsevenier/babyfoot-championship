@@ -613,3 +613,74 @@ main {
   .podium-row { flex-direction: column; }
   .podium-card { min-width: unset; }
 }
+
+/* ─── Nouvelles évolutions ────────────────────────────────────────────────── */
+
+/* Tri de colonnes */
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { color: var(--gray-800); background: var(--gray-100); }
+.active-sort { color: var(--green) !important; }
+
+/* Winner preview */
+#winner-preview.winner-a { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+#winner-preview.winner-b { background: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8; }
+#winner-preview.winner-draw { background: var(--gray-100); color: var(--gray-500); border: 1px solid var(--gray-200); }
+
+/* Palmarès */
+.palmares-month-card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  padding: 1rem 1.25rem;
+  margin-bottom: .75rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.palmares-mois { font-size: 13px; font-weight: 600; color: var(--gray-500); min-width: 80px; }
+.palmares-winner { font-size: 15px; font-weight: 700; color: var(--gray-900); }
+.palmares-stats { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+
+.player-detail-card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.player-detail-header {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--gray-100);
+  cursor: pointer;
+}
+.player-detail-body { padding: 1rem 1.25rem; display: none; }
+.player-detail-body.open { display: block; }
+
+.ratio-bar-wrap { background: var(--gray-100); border-radius: 100px; height: 6px; overflow: hidden; margin-top: 4px; }
+.ratio-bar { height: 100%; background: var(--green); border-radius: 100px; transition: width .4s; }
+
+.month-ratio-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.month-ratio-label { min-width: 60px; color: var(--gray-500); }
+.month-ratio-val { min-width: 36px; font-weight: 600; text-align: right; }
+
+/* Score buttons plus grands sur mobile */
+@media (max-width: 640px) {
+  .score-btn { width: 40px; height: 40px; font-size: 20px; }
+  .score-input { width: 64px; font-size: 20px; }
+}
+
+/* Notification */
+#notif-banner { animation: slideDown .3s ease; }
+@keyframes slideDown { from { opacity:0; transform: translateX(-50%) translateY(-10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
