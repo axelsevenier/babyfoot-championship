@@ -363,7 +363,11 @@ function renderHistory() {
     const winner = vA ? `${m.a1} & ${m.a2}` : `${m.b1} & ${m.b2}`;
     const scoreA = vA ? `<strong>${m.ba}</strong>` : m.ba;
     const scoreB = !vA ? `<strong>${m.bb}</strong>` : m.bb;
-    const deleteBtn = m._id ? `<button onclick="deleteMatch('${m._id}')" style="margin-left:auto;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:16px;padding:2px 6px;" title="Supprimer">×</button>` : '';
+    const actions = m._id ? `
+      <div style="display:flex;gap:4px;margin-left:auto">
+        <button onclick="openEditModal('${m._id}')" style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:500" title="Modifier">✏️ Modifier</button>
+        <button onclick="deleteMatch('${m._id}')" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer" title="Supprimer">×</button>
+      </div>` : '';
     return `<div class="match-card">
       <span class="match-month">${MOIS_COURT[m.mois]}</span>
       <div class="match-teams">
@@ -374,7 +378,7 @@ function renderHistory() {
       </div>
       <span class="winner-pill">🏆 ${winner}</span>
       ${m.date ? `<span class="match-date">${m.date}</span>` : ''}
-      ${deleteBtn}
+      ${actions}
     </div>`;
   }).join('');
 }
@@ -386,6 +390,83 @@ async function deleteMatch(id) {
   await reloadMatchs();
 }
 window.deleteMatch = deleteMatch;
+
+// ─── Modal modification ────────────────────────────────────────────────────────
+let editingId = null;
+
+function openEditModal(id) {
+  const m = state.matchs.find(x => x._id === id);
+  if (!m) return;
+  editingId = id;
+
+  // Remplir le select mois
+  const moisSel = document.getElementById('e-mois');
+  moisSel.innerHTML = MOIS_NOMS.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  moisSel.value = m.mois;
+
+  // Remplir les selects joueurs
+  const opts = state.joueurs.map(j => `<option>${j}</option>`).join('');
+  ['e-a1','e-a2','e-b1','e-b2'].forEach(id => {
+    document.getElementById(id).innerHTML = opts;
+  });
+  document.getElementById('e-a1').value = m.a1;
+  document.getElementById('e-a2').value = m.a2;
+  document.getElementById('e-b1').value = m.b1;
+  document.getElementById('e-b2').value = m.b2;
+  document.getElementById('e-ba').value = m.ba;
+  document.getElementById('e-bb').value = m.bb;
+  document.getElementById('e-date').value = m.date || '';
+  document.getElementById('e-msg').textContent = '';
+
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  editingId = null;
+}
+
+async function saveEditMatch() {
+  const a1 = document.getElementById('e-a1').value;
+  const a2 = document.getElementById('e-a2').value;
+  const b1 = document.getElementById('e-b1').value;
+  const b2 = document.getElementById('e-b2').value;
+  const ba = parseInt(document.getElementById('e-ba').value) || 0;
+  const bb = parseInt(document.getElementById('e-bb').value) || 0;
+  const mois = parseInt(document.getElementById('e-mois').value);
+  const date = document.getElementById('e-date').value;
+  const msg = document.getElementById('e-msg');
+
+  if (new Set([a1, a2, b1, b2]).size < 4) {
+    msg.textContent = '⚠ 4 joueurs différents requis.';
+    msg.className = 'save-msg error'; return;
+  }
+  if (ba === bb) {
+    msg.textContent = '⚠ Pas de match nul.';
+    msg.className = 'save-msg error'; return;
+  }
+
+  const btn = document.getElementById('e-save-btn');
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+
+  await fbSet(`/matchs/${editingId}`, { mois, a1, a2, b1, b2, ba, bb, date });
+  await reloadMatchs();
+
+  btn.disabled = false; btn.textContent = 'Enregistrer';
+  closeEditModal();
+}
+
+window.openEditModal = openEditModal;
+window.closeEditModal = closeEditModal;
+window.saveEditMatch = saveEditMatch;
+
+// Fermer la modal en cliquant à l'extérieur
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
 
 // ─── Render: Duos ─────────────────────────────────────────────────────────────
 function renderDuos() {
