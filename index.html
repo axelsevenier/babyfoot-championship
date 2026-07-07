@@ -64,9 +64,9 @@
         <button class="mode-btn" id="mode-btn-1v1" onclick="setMode('1v1')">1 vs 1</button>
       </div>
       <nav id="main-nav">
-        <button class="nav-btn active" data-page="general"><span class="nav-icon">🏆</span><span>Classement</span></button>
+        <button class="nav-btn" data-page="general"><span class="nav-icon">🏆</span><span>Classement</span></button>
         <button class="nav-btn" data-page="saisie"><span class="nav-icon">➕</span><span>Saisir</span></button>
-        <button class="nav-btn" data-page="mensuel"><span class="nav-icon">📅</span><span>Mois</span></button>
+        <button class="nav-btn active" data-page="mensuel"><span class="nav-icon">📅</span><span>Mois</span></button>
         <button class="nav-btn" data-page="palmares"><span class="nav-icon">🎖️</span><span>Palmarès</span></button>
         <button class="nav-btn" data-page="matchs"><span class="nav-icon">📋</span><span>Matchs</span></button>
         <button class="nav-btn" data-page="duos" id="nav-duos"><span class="nav-icon">🤝</span><span id="nav-duos-label">Duos</span></button>
@@ -92,7 +92,7 @@
   <main id="main-swipe">
 
     <!-- PAGE CLASSEMENT GÉNÉRAL -->
-    <section id="page-general" class="page active">
+    <section id="page-general" class="page">
       <div class="page-header">
         <h2>Classement général</h2>
         <span class="page-sub">Cumul toute la saison</span>
@@ -124,6 +124,7 @@
         <span class="page-sub" id="saisie-sub">Match 2 contre 2</span>
       </div>
       <div class="card form-card">
+        <button class="btn" onclick="suggestMatch()" style="width:100%;margin-bottom:1.25rem;border:1px dashed #16a34a;color:#16a34a;background:#f0fdf4;font-weight:600">🎲 Proposer un match équilibré</button>
         <div class="form-section">
           <label class="form-label">Mois</label>
           <select id="s-mois" class="form-select"></select>
@@ -140,6 +141,7 @@
                   <button class="score-btn" onclick="adjustScore('s-ba',-1)">−</button>
                   <input type="number" id="s-ba" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
                   <button class="score-btn" onclick="adjustScore('s-ba',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('s-ba',10)">10</button>
                 </div>
               </div>
             </div>
@@ -153,6 +155,7 @@
                   <button class="score-btn" onclick="adjustScore('s-bb',-1)">−</button>
                   <input type="number" id="s-bb" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
                   <button class="score-btn" onclick="adjustScore('s-bb',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('s-bb',10)">10</button>
                 </div>
               </div>
             </div>
@@ -169,6 +172,7 @@
                   <button class="score-btn" onclick="adjustScore('s-1ba',-1)">−</button>
                   <input type="number" id="s-1ba" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
                   <button class="score-btn" onclick="adjustScore('s-1ba',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('s-1ba',10)">10</button>
                 </div>
               </div>
             </div>
@@ -181,6 +185,7 @@
                   <button class="score-btn" onclick="adjustScore('s-1bb',-1)">−</button>
                   <input type="number" id="s-1bb" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
                   <button class="score-btn" onclick="adjustScore('s-1bb',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('s-1bb',10)">10</button>
                 </div>
               </div>
             </div>
@@ -196,7 +201,7 @@
     </section>
 
     <!-- PAGE MENSUEL -->
-    <section id="page-mensuel" class="page">
+    <section id="page-mensuel" class="page active">
       <div class="page-header"><h2>Classements mensuels</h2><span class="page-sub">Min. 3 matchs pour être classé</span></div>
       <div class="month-pills" id="month-pills"></div>
       <div id="mensuel-content"></div>
@@ -268,6 +273,7 @@
                 <button class="score-btn" onclick="adjustScore('e-ba',-1)">−</button>
                 <input type="number" id="e-ba" min="0" max="20" class="score-input">
                 <button class="score-btn" onclick="adjustScore('e-ba',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('e-ba',10)">10</button>
               </div>
             </div>
           </div>
@@ -281,6 +287,7 @@
                 <button class="score-btn" onclick="adjustScore('e-bb',-1)">−</button>
                 <input type="number" id="e-bb" min="0" max="20" class="score-input">
                 <button class="score-btn" onclick="adjustScore('e-bb',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('e-bb',10)">10</button>
               </div>
             </div>
           </div>
@@ -296,6 +303,7 @@
                 <button class="score-btn" onclick="adjustScore('e-1ba',-1)">−</button>
                 <input type="number" id="e-1ba" min="0" max="20" class="score-input">
                 <button class="score-btn" onclick="adjustScore('e-1ba',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('e-1ba',10)">10</button>
               </div>
             </div>
           </div>
@@ -308,6 +316,7 @@
                 <button class="score-btn" onclick="adjustScore('e-1bb',-1)">−</button>
                 <input type="number" id="e-1bb" min="0" max="20" class="score-input">
                 <button class="score-btn" onclick="adjustScore('e-1bb',1)">+</button>
+                  <button class="score-btn score-quick" onclick="setScore('e-1bb',10)">10</button>
               </div>
             </div>
           </div>
