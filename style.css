@@ -722,3 +722,7 @@ main {
 }
 .mode-banner-2v2 { background: #dbeafe; color: #1e40af; }
 .mode-banner-1v1 { background: #fce7f3; color: #9d174d; }
+
+/* Bouton score rapide 10 */
+.score-quick { font-size: 12px; font-weight: 700; background: #f0fdf4; border-color: #bbf7d0; color: #16a34a; }
+.score-quick:hover { background: #dcfce7; }
