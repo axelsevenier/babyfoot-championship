@@ -545,10 +545,31 @@ function renderMensuel(mois) {
 window.renderMensuel = renderMensuel;
 
 // ─── Render: Palmarès ────────────────────────────────────────────────────────
+let palmaresMoisFilter = ''; // '' = toute la saison
+
+function palmaresMatchs() {
+  if (palmaresMoisFilter === '') return S().matchs;
+  return S().matchs.filter(m => m.mois === parseInt(palmaresMoisFilter));
+}
+
+function setPalmaresFilter(val) {
+  palmaresMoisFilter = val;
+  const j1 = document.getElementById('cmp-j1')?.value || '';
+  const j2 = document.getElementById('cmp-j2')?.value || '';
+  renderPalmares();
+  // Restaurer la sélection du comparateur
+  if (j1) document.getElementById('cmp-j1').value = j1;
+  if (j2) document.getElementById('cmp-j2').value = j2;
+  if (j1 && j2) renderComparateur();
+}
+window.setPalmaresFilter = setPalmaresFilter;
+
 function renderPalmares() {
   const content = document.getElementById('palmares-content');
   const moisAvecData = [...new Set(S().matchs.map(m => m.mois))].sort((a,b) => a-b);
   if (!moisAvecData.length) { content.innerHTML = '<div class="empty-state"><div class="empty-icon">🎖️</div><p>Aucune donnée.</p></div>'; return; }
+
+  const fMatchs = palmaresMatchs(); // matchs filtrés pour records + comparateur
 
   const titresHTML = moisAvecData.map(mois => {
     const matchsMois = S().matchs.filter(m => m.mois === mois);
@@ -607,7 +628,7 @@ function renderPalmares() {
   // ── Homme en forme (meilleur ratio sur les 10 derniers matchs, min 5 joués) ──
   let enForme = null;
   S().joueurs.forEach(j => {
-    const perso = S().matchs.filter(m => {
+    const perso = fMatchs.filter(m => {
       const is1v1 = !m.a2;
       return is1v1 ? [m.a1,m.b1].includes(j) : [m.a1,m.a2,m.b1,m.b2].includes(j);
     }).slice(-10);
@@ -618,17 +639,17 @@ function renderPalmares() {
 
   // ── Records ──
   let bigWin = null;
-  S().matchs.forEach(m => {
+  fMatchs.forEach(m => {
     const gap = Math.abs(m.ba - m.bb);
     if (!bigWin || gap > bigWin.gap) bigWin = { ...m, gap };
   });
   let maxStreak = null;
   S().joueurs.forEach(j => {
-    const ms = getMaxStreak(S().matchs, j);
+    const ms = getMaxStreak(fMatchs, j);
     if (!maxStreak || ms > maxStreak.n) maxStreak = { j, n: ms };
   });
   const parMois = {};
-  S().matchs.forEach(m => { parMois[m.mois] = (parMois[m.mois] || 0) + 1; });
+  fMatchs.forEach(m => { parMois[m.mois] = (parMois[m.mois] || 0) + 1; });
   let moisActif = null;
   Object.entries(parMois).forEach(([mois, n]) => {
     if (!moisActif || n > moisActif.n) moisActif = { mois: parseInt(mois), n };
@@ -637,12 +658,25 @@ function renderPalmares() {
   const is1v1BW = bigWin && !bigWin.a2;
   const bigWinLabel = bigWin ? `${is1v1BW ? bigWin.a1 : bigWin.a1+' & '+bigWin.a2} ${bigWin.ba} – ${bigWin.bb} ${is1v1BW ? bigWin.b1 : bigWin.b1+' & '+bigWin.b2}` : '—';
 
+  // Sélecteur de mois pour records + comparateur
+  const moisFilterOptions = '<option value="">Toute la saison</option>' + moisAvecData.map(mois =>
+    `<option value="${mois}" ${String(mois) === palmaresMoisFilter ? 'selected' : ''}>${MOIS_NOMS[mois]}</option>`
+  ).join('');
+  const filterHTML = `
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">Filtrer records & comparateur :</label>
+      <select class="form-select" style="width:auto;min-width:160px" onchange="setPalmaresFilter(this.value)">${moisFilterOptions}</select>
+    </div>`;
+
+  const periodLabel = palmaresMoisFilter === '' ? '' : ` (${MOIS_NOMS[parseInt(palmaresMoisFilter)]})`;
+
   const recordsHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem">
-      ${enForme ? `<div class="duo-stat-card" style="border-top:3px solid #16a34a"><div class="duo-stat-label">💪 L'homme en forme</div><div style="font-size:16px;font-weight:800">${enForme.j}</div><div style="font-size:11px;color:#6b7280">${enForme.ratio}% sur ses ${enForme.n} derniers matchs</div></div>` : ''}
-      ${bigWin ? `<div class="duo-stat-card" style="border-top:3px solid #f59e0b"><div class="duo-stat-label">💥 Plus grosse victoire</div><div style="font-size:13px;font-weight:700">${bigWinLabel}</div><div style="font-size:11px;color:#6b7280">Écart de ${bigWin.gap} buts</div></div>` : ''}
-      ${maxStreak && maxStreak.n >= 2 ? `<div class="duo-stat-card" style="border-top:3px solid #dc2626"><div class="duo-stat-label">🔥 Plus longue série</div><div style="font-size:16px;font-weight:800">${maxStreak.j}</div><div style="font-size:11px;color:#6b7280">${maxStreak.n} victoires d'affilée</div></div>` : ''}
-      ${moisActif ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Mois le plus actif</div><div style="font-size:16px;font-weight:800">${MOIS_NOMS[moisActif.mois]}</div><div style="font-size:11px;color:#6b7280">${moisActif.n} matchs joués</div></div>` : ''}
+      ${enForme ? `<div class="duo-stat-card" style="border-top:3px solid #16a34a"><div class="duo-stat-label">💪 L'homme en forme${periodLabel}</div><div style="font-size:16px;font-weight:800">${enForme.j}</div><div style="font-size:11px;color:#6b7280">${enForme.ratio}% sur ses ${enForme.n} derniers matchs</div></div>` : ''}
+      ${bigWin ? `<div class="duo-stat-card" style="border-top:3px solid #f59e0b"><div class="duo-stat-label">💥 Plus grosse victoire${periodLabel}</div><div style="font-size:13px;font-weight:700">${bigWinLabel}</div><div style="font-size:11px;color:#6b7280">Écart de ${bigWin.gap} buts</div></div>` : ''}
+      ${maxStreak && maxStreak.n >= 2 ? `<div class="duo-stat-card" style="border-top:3px solid #dc2626"><div class="duo-stat-label">🔥 Plus longue série${periodLabel}</div><div style="font-size:16px;font-weight:800">${maxStreak.j}</div><div style="font-size:11px;color:#6b7280">${maxStreak.n} victoires d'affilée</div></div>` : ''}
+      ${moisActif && palmaresMoisFilter === '' ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Mois le plus actif</div><div style="font-size:16px;font-weight:800">${MOIS_NOMS[moisActif.mois]}</div><div style="font-size:11px;color:#6b7280">${moisActif.n} matchs joués</div></div>` : ''}
+      ${moisActif && palmaresMoisFilter !== '' ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Matchs joués${periodLabel}</div><div style="font-size:16px;font-weight:800">${moisActif.n}</div></div>` : ''}
     </div>`;
 
   // ── Comparateur ──
@@ -659,6 +693,7 @@ function renderPalmares() {
     </div>`;
 
   content.innerHTML = `
+    ${filterHTML}
     ${recordsHTML}
     ${comparateurHTML}
     <div style="margin-bottom:1.5rem">
@@ -677,11 +712,12 @@ function renderComparateur() {
   const res = document.getElementById('cmp-result');
   if (!j1 || !j2 || j1 === j2) { res.innerHTML = ''; return; }
 
-  const s1 = calcStats(S().matchs, j1);
-  const s2 = calcStats(S().matchs, j2);
+  const cMatchs = palmaresMatchs();
+  const s1 = calcStats(cMatchs, j1);
+  const s2 = calcStats(cMatchs, j2);
 
   // Confrontations directes (camps opposés)
-  const vs = S().matchs.filter(m => {
+  const vs = cMatchs.filter(m => {
     const is1v1 = !m.a2;
     if (is1v1) return (m.a1===j1&&m.b1===j2)||(m.a1===j2&&m.b1===j1);
     const j1inA = [m.a1,m.a2].includes(j1);
@@ -693,7 +729,7 @@ function renderComparateur() {
   const sVs = calcStats(vs, j1);
 
   // Ensemble (2v2 uniquement)
-  const ensemble = currentMode === '2v2' ? S().matchs.filter(m =>
+  const ensemble = currentMode === '2v2' ? cMatchs.filter(m =>
     ([m.a1,m.a2].includes(j1) && [m.a1,m.a2].includes(j2)) ||
     ([m.b1,m.b2].includes(j1) && [m.b1,m.b2].includes(j2))
   ) : [];
@@ -717,7 +753,7 @@ function renderComparateur() {
     <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;margin-bottom:1rem">
       <span style="color:#2563eb">${j1}</span><span style="color:#dc2626">${j2}</span>
     </div>
-    ${bar(s1.v, s2.v, 'Victoires (saison)')}
+    ${bar(s1.v, s2.v, palmaresMoisFilter === '' ? 'Victoires (saison)' : 'Victoires (' + MOIS_NOMS[parseInt(palmaresMoisFilter)] + ')')}
     ${bar(s1.ratio, s2.ratio, 'Ratio %')}
     ${vs.length ? bar(sVs.v, sVs.d, `Face-à-face (${vs.length} matchs)`) : '<p style="font-size:12px;color:#9ca3af;text-align:center">Jamais affrontés directement.</p>'}
     ${sEns ? `<p style="font-size:12px;color:#6b7280;text-align:center;margin-top:.5rem">🤝 En duo ensemble : ${sEns.v}V – ${sEns.d}D (${sEns.ratio}%) sur ${ensemble.length} matchs</p>` : ''}
