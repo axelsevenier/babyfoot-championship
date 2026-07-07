@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Championnat Babyfoot</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -59,9 +62,12 @@
         </div>
       </div>
       <!-- SÉLECTEUR DE MODE -->
-      <div class="mode-switcher">
-        <button class="mode-btn active" id="mode-btn-2v2" onclick="setMode('2v2')">2 vs 2</button>
-        <button class="mode-btn" id="mode-btn-1v1" onclick="setMode('1v1')">1 vs 1</button>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <div class="mode-switcher">
+          <button class="mode-btn active" id="mode-btn-2v2" onclick="setMode('2v2')">2 vs 2</button>
+          <button class="mode-btn" id="mode-btn-1v1" onclick="setMode('1v1')">1 vs 1</button>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Mode sombre">🌙</button>
       </div>
       <nav id="main-nav">
         <button class="nav-btn" data-page="general"><span class="nav-icon">🏆</span><span>Classement</span></button>
@@ -75,10 +81,10 @@
     </div>
   </header>
 
-  <div id="loading-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1rem">
-    <div style="font-size:36px">⚽</div>
-    <div style="color:#fff;font-size:16px;font-weight:500">Chargement des données...</div>
-    <div style="color:#9ca3af;font-size:13px">Connexion à Firebase</div>
+  <div id="loading-overlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#0a2e1f,#14532d);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1.25rem">
+    <div class="loader-ball">⚽</div>
+    <div style="color:#fff;font-size:17px;font-weight:600;font-family:'Bebas Neue',sans-serif;letter-spacing:.1em">CHARGEMENT DU CHAMPIONNAT</div>
+    <div class="loader-shimmer"></div>
   </div>
   <div id="loading-error" style="display:none;position:fixed;bottom:20px;right:20px;background:#dc2626;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px">
     ⚠ Impossible de se connecter à la base de données.
@@ -256,10 +262,10 @@
 
   <!-- MODAL MODIFICATION MATCH -->
   <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;padding:1rem">
-    <div style="background:#fff;border-radius:12px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto">
+    <div style="background:var(--surface);border-radius:14px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
-        <h2 style="font-size:17px;font-weight:700">Modifier le match</h2>
-        <button onclick="closeEditModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;padding:2px 6px">×</button>
+        <h2 style="font-size:17px;font-weight:700;color:var(--text)">Modifier le match</h2>
+        <button onclick="closeEditModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-soft);padding:2px 6px">×</button>
       </div>
       <div class="form-section"><label class="form-label">Mois</label><select id="e-mois" class="form-select"></select></div>
       <div id="edit-form-2v2">
@@ -325,7 +331,7 @@
       <div class="form-section"><label class="form-label">Date (optionnel)</label><input type="date" id="e-date" class="form-input"></div>
       <div style="display:flex;gap:.75rem;margin-top:1rem">
         <button class="btn btn-primary" onclick="saveEditMatch()" id="e-save-btn" style="flex:1">Enregistrer</button>
-        <button class="btn" onclick="closeEditModal()" style="border:1px solid #d1d5db">Annuler</button>
+        <button class="btn" onclick="closeEditModal()" style="border:1px solid var(--gray-300)">Annuler</button>
       </div>
       <span id="e-msg" class="save-msg" style="display:block;margin-top:.5rem"></span>
     </div>
