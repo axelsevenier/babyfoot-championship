@@ -397,6 +397,9 @@ function confrontCount(matchs, j1, j2) {
 
 function suggestMatch() {
   const actifs = S().joueurs.filter(j => !paused.includes(j));
+  // Équilibrage basé sur le mois sélectionné dans le formulaire de saisie
+  const moisCible = parseInt(document.getElementById('s-mois')?.value ?? new Date().getMonth());
+  const matchsMois = S().matchs.filter(m => m.mois === moisCible);
 
   if (currentMode === '2v2') {
     if (actifs.length < 4) { alert('Il faut au moins 4 joueurs actifs (hors pause).'); return; }
@@ -413,7 +416,7 @@ function suggestMatch() {
         [[quad[0],quad[3]],[quad[1],quad[2]]],
       ];
       splits.forEach(([tA, tB]) => {
-        const score = duoCount(S().matchs, tA[0], tA[1]) + duoCount(S().matchs, tB[0], tB[1]);
+        const score = duoCount(matchsMois, tA[0], tA[1]) + duoCount(matchsMois, tB[0], tB[1]);
         if (!best || score < best.score || (score === best.score && Math.random() < 0.5)) {
           best = { tA, tB, score };
         }
@@ -428,7 +431,7 @@ function suggestMatch() {
     let best = null;
     for (let i = 0; i < actifs.length; i++)
     for (let k = i+1; k < actifs.length; k++) {
-      const n = confrontCount(S().matchs, actifs[i], actifs[k]);
+      const n = confrontCount(matchsMois, actifs[i], actifs[k]);
       if (!best || n < best.n || (n === best.n && Math.random() < 0.5)) {
         best = { j1: actifs[i], j2: actifs[k], n };
       }
