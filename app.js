@@ -395,16 +395,24 @@ function confrontCount(matchs, j1, j2) {
   return matchs.filter(m => (m.a1===j1&&m.b1===j2)||(m.a1===j2&&m.b1===j1)).length;
 }
 
+// Index de rotation des suggestions (réinitialisé quand le contexte change)
+let suggestIdx = 0;
+let suggestKey = '';
+
 function suggestMatch() {
   const actifs = S().joueurs.filter(j => !paused.includes(j));
   // Équilibrage basé sur le mois sélectionné dans le formulaire de saisie
   const moisCible = parseInt(document.getElementById('s-mois')?.value ?? new Date().getMonth());
   const matchsMois = S().matchs.filter(m => m.mois === moisCible);
 
+  // Si le contexte change (mode, mois, joueurs, nb matchs), on repart de la proposition n°1
+  const key = `${currentMode}|${moisCible}|${actifs.join(',')}|${matchsMois.length}`;
+  if (key !== suggestKey) { suggestKey = key; suggestIdx = 0; }
+
   if (currentMode === '2v2') {
     if (actifs.length < 4) { alert('Il faut au moins 4 joueurs actifs (hors pause).'); return; }
-    // Énumérer toutes les combinaisons de 4 joueurs et les 3 répartitions possibles
-    let best = null;
+    // Énumérer toutes les répartitions possibles et les classer par priorité
+    const options = [];
     for (let a = 0; a < actifs.length; a++)
     for (let b = a+1; b < actifs.length; b++)
     for (let c = b+1; c < actifs.length; c++)
@@ -417,27 +425,28 @@ function suggestMatch() {
       ];
       splits.forEach(([tA, tB]) => {
         const score = duoCount(matchsMois, tA[0], tA[1]) + duoCount(matchsMois, tB[0], tB[1]);
-        if (!best || score < best.score || (score === best.score && Math.random() < 0.5)) {
-          best = { tA, tB, score };
-        }
+        options.push({ tA, tB, score });
       });
     }
-    document.getElementById('s-a1').value = best.tA[0];
-    document.getElementById('s-a2').value = best.tA[1];
-    document.getElementById('s-b1').value = best.tB[0];
-    document.getElementById('s-b2').value = best.tB[1];
+    options.sort((x, y) => x.score - y.score);
+    const pick = options[suggestIdx % options.length];
+    suggestIdx++;
+    document.getElementById('s-a1').value = pick.tA[0];
+    document.getElementById('s-a2').value = pick.tA[1];
+    document.getElementById('s-b1').value = pick.tB[0];
+    document.getElementById('s-b2').value = pick.tB[1];
   } else {
     if (actifs.length < 2) { alert('Il faut au moins 2 joueurs actifs (hors pause).'); return; }
-    let best = null;
+    const options = [];
     for (let i = 0; i < actifs.length; i++)
     for (let k = i+1; k < actifs.length; k++) {
-      const n = confrontCount(matchsMois, actifs[i], actifs[k]);
-      if (!best || n < best.n || (n === best.n && Math.random() < 0.5)) {
-        best = { j1: actifs[i], j2: actifs[k], n };
-      }
+      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]) });
     }
-    document.getElementById('s-1a').value = best.j1;
-    document.getElementById('s-1b').value = best.j2;
+    options.sort((x, y) => x.n - y.n);
+    const pick = options[suggestIdx % options.length];
+    suggestIdx++;
+    document.getElementById('s-1a').value = pick.j1;
+    document.getElementById('s-1b').value = pick.j2;
   }
   updateWinnerPreview();
 }
