@@ -39,6 +39,7 @@ const DEFAULT_MATCHS_2V2 = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentMode = '2v2'; // '2v2' ou '1v1'
+let paused = []; // joueurs en pause (partagé entre les modes)
 let state = {
   '2v2': { joueurs: [...DEFAULT_JOUEURS], matchs: [] },
   '1v1': { joueurs: [...DEFAULT_JOUEURS], matchs: [] }
@@ -96,11 +97,16 @@ async function initFirebase() {
       lastMatchCount[mode] = state[mode].matchs.length;
     }
 
+    // Charger les joueurs en pause
+    const pausedRaw = await fbGet('/paused');
+    paused = Array.isArray(pausedRaw) ? pausedRaw : Object.values(pausedRaw || {});
+
     showLoading(false);
-    renderGeneral();
+    renderMensuel(activeMois);
     renderSaisie();
 
     // Écoute temps réel pour les deux modes
+    fbListen('/paused', (d) => { paused = Array.isArray(d) ? d : Object.values(d || {}); });
     fbListen('/2v2/matchs', () => reloadMatchs('2v2', true));
     fbListen('/1v1/matchs', () => reloadMatchs('1v1', true));
     fbListen('/2v2/joueurs', () => reloadJoueurs('2v2'));
@@ -205,6 +211,56 @@ function calcStats(matchs, joueur) {
   return { v, d, matchs: total, diff, ratio: total > 0 ? Math.round(v/total*100) : 0 };
 }
 
+function defaultRanking(matchs, joueurs, minMatchs = 0) {
+  return joueurs
+    .map(j => ({ j, ...calcStats(matchs, j) }))
+    .filter(r => r.matchs >= minMatchs)
+    .sort((a, b) => (b.ratio - a.ratio) || (b.diff - a.diff) || (b.v - a.v));
+}
+
+function getStreak(matchs, joueur) {
+  let streak = 0;
+  for (let i = matchs.length - 1; i >= 0; i--) {
+    const m = matchs[i];
+    const is1v1 = !m.a2;
+    const inA = is1v1 ? m.a1 === joueur : [m.a1,m.a2].includes(joueur);
+    const inB = is1v1 ? m.b1 === joueur : [m.b1,m.b2].includes(joueur);
+    if (!inA && !inB) continue;
+    const won = inA ? m.ba > m.bb : m.bb > m.ba;
+    if (won) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function getMaxStreak(matchs, joueur) {
+  let max = 0, cur = 0;
+  matchs.forEach(m => {
+    const is1v1 = !m.a2;
+    const inA = is1v1 ? m.a1 === joueur : [m.a1,m.a2].includes(joueur);
+    const inB = is1v1 ? m.b1 === joueur : [m.b1,m.b2].includes(joueur);
+    if (!inA && !inB) return;
+    const won = inA ? m.ba > m.bb : m.bb > m.ba;
+    if (won) { cur++; max = Math.max(max, cur); }
+    else cur = 0;
+  });
+  return max;
+}
+
+// Évolution du rang : compare avec le classement sans les 5 derniers matchs
+function getRankEvolution(matchs, joueurs) {
+  const current = defaultRanking(matchs, joueurs, 0);
+  const prevMatchs = matchs.slice(0, Math.max(0, matchs.length - 5));
+  const previous = defaultRanking(prevMatchs, joueurs, 0);
+  const evo = {};
+  current.forEach((r, i) => {
+    const prevIdx = previous.findIndex(p => p.j === r.j);
+    if (prevIdx === -1) { evo[r.j] = 0; return; }
+    evo[r.j] = prevIdx - i; // positif = monte
+  });
+  return evo;
+}
+
 function sortedRanking(matchs, joueurs, minMatchs = 0) {
   return joueurs
     .map(j => ({ j, ...calcStats(matchs, j) }))
@@ -262,13 +318,18 @@ function renderGeneral() {
     </div>`
   ).join('');
 
+  const evo = getRankEvolution(S().matchs, S().joueurs);
   document.getElementById('tbody-general').innerHTML = rows.map((r, i) => {
     const medal = i < 3 ? medals[i] : (i + 1);
     const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
     const diffStr = r.diff > 0 ? '+' + r.diff : r.diff;
+    const e = evo[r.j] || 0;
+    const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:11px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:11px">▼</span>' : '<span style="color:#d1d5db;font-size:11px">–</span>';
+    const streak = getStreak(S().matchs, r.j);
+    const streakBadge = streak >= 3 ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600">🔥${streak}</span>` : '';
     return `<tr>
-      <td class="col-rank">${medal}</td>
-      <td style="font-weight:600;cursor:pointer" onclick="showPlayerDetail('${r.j}')">${r.j} <span style="font-size:10px;color:#9ca3af">↗</span></td>
+      <td class="col-rank">${medal} ${evoIcon}</td>
+      <td style="font-weight:600;cursor:pointer" onclick="showPlayerDetail('${r.j}')">${r.j}${streakBadge} <span style="font-size:10px;color:#9ca3af">↗</span></td>
       <td class="col-num">${r.v}</td>
       <td class="col-num">${r.d}</td>
       <td class="col-num">${r.matchs}</td>
@@ -307,6 +368,69 @@ function adjustScore(id, delta) {
   updateWinnerPreview();
 }
 window.adjustScore = adjustScore;
+
+function setScore(id, val) {
+  document.getElementById(id).value = val;
+  updateWinnerPreview();
+}
+window.setScore = setScore;
+
+// ─── Suggestion d'équipes équilibrées ─────────────────────────────────────────
+function duoCount(matchs, j1, j2) {
+  return matchs.filter(m =>
+    ([m.a1,m.a2].includes(j1) && [m.a1,m.a2].includes(j2)) ||
+    ([m.b1,m.b2].includes(j1) && [m.b1,m.b2].includes(j2))
+  ).length;
+}
+
+function confrontCount(matchs, j1, j2) {
+  return matchs.filter(m => (m.a1===j1&&m.b1===j2)||(m.a1===j2&&m.b1===j1)).length;
+}
+
+function suggestMatch() {
+  const actifs = S().joueurs.filter(j => !paused.includes(j));
+
+  if (currentMode === '2v2') {
+    if (actifs.length < 4) { alert('Il faut au moins 4 joueurs actifs (hors pause).'); return; }
+    // Énumérer toutes les combinaisons de 4 joueurs et les 3 répartitions possibles
+    let best = null;
+    for (let a = 0; a < actifs.length; a++)
+    for (let b = a+1; b < actifs.length; b++)
+    for (let c = b+1; c < actifs.length; c++)
+    for (let d = c+1; d < actifs.length; d++) {
+      const quad = [actifs[a], actifs[b], actifs[c], actifs[d]];
+      const splits = [
+        [[quad[0],quad[1]],[quad[2],quad[3]]],
+        [[quad[0],quad[2]],[quad[1],quad[3]]],
+        [[quad[0],quad[3]],[quad[1],quad[2]]],
+      ];
+      splits.forEach(([tA, tB]) => {
+        const score = duoCount(S().matchs, tA[0], tA[1]) + duoCount(S().matchs, tB[0], tB[1]);
+        if (!best || score < best.score || (score === best.score && Math.random() < 0.5)) {
+          best = { tA, tB, score };
+        }
+      });
+    }
+    document.getElementById('s-a1').value = best.tA[0];
+    document.getElementById('s-a2').value = best.tA[1];
+    document.getElementById('s-b1').value = best.tB[0];
+    document.getElementById('s-b2').value = best.tB[1];
+  } else {
+    if (actifs.length < 2) { alert('Il faut au moins 2 joueurs actifs (hors pause).'); return; }
+    let best = null;
+    for (let i = 0; i < actifs.length; i++)
+    for (let k = i+1; k < actifs.length; k++) {
+      const n = confrontCount(S().matchs, actifs[i], actifs[k]);
+      if (!best || n < best.n || (n === best.n && Math.random() < 0.5)) {
+        best = { j1: actifs[i], j2: actifs[k], n };
+      }
+    }
+    document.getElementById('s-1a').value = best.j1;
+    document.getElementById('s-1b').value = best.j2;
+  }
+  updateWinnerPreview();
+}
+window.suggestMatch = suggestMatch;
 
 function updateWinnerPreview() {
   const preview = document.getElementById('winner-preview');
@@ -406,12 +530,14 @@ function renderMensuel(mois) {
     <div class="card">
       <table class="ranking-table"><thead><tr><th class="col-rank">Rang</th><th>Joueur</th><th class="col-num">V</th><th class="col-num">D</th><th class="col-num">Matchs</th><th class="col-num">Diff.</th><th class="col-num">Ratio</th></tr></thead>
       <tbody>
-        ${ranked.map((r, i) => {
+        ${(() => { const evoM = getRankEvolution(matchsMois, S().joueurs); return ranked.map((r, i) => {
           const medal = i < 3 ? medals[i] : (i+1);
           const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
           const diffStr = r.diff > 0 ? '+'+r.diff : r.diff;
-          return `<tr><td class="col-rank">${medal}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
-        }).join('')}
+          const e = evoM[r.j] || 0;
+          const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:10px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:10px">▼</span>' : '';
+          return `<tr><td class="col-rank">${medal}${evoIcon}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
+        }).join(''); })()}
         ${nonClass.length ? `<tr><td colspan="7" style="font-size:11px;color:#9ca3af;padding-top:10px">N/C (< ${minM} matchs) : ${nonClass.join(', ')}</td></tr>` : ''}
       </tbody></table>
     </div>`;
@@ -478,7 +604,63 @@ function renderPalmares() {
     </div>`;
   }).join('');
 
+  // ── Homme en forme (meilleur ratio sur les 10 derniers matchs, min 5 joués) ──
+  let enForme = null;
+  S().joueurs.forEach(j => {
+    const perso = S().matchs.filter(m => {
+      const is1v1 = !m.a2;
+      return is1v1 ? [m.a1,m.b1].includes(j) : [m.a1,m.a2,m.b1,m.b2].includes(j);
+    }).slice(-10);
+    if (perso.length < 5) return;
+    const s = calcStats(perso, j);
+    if (!enForme || s.ratio > enForme.ratio) enForme = { j, ratio: s.ratio, n: perso.length };
+  });
+
+  // ── Records ──
+  let bigWin = null;
+  S().matchs.forEach(m => {
+    const gap = Math.abs(m.ba - m.bb);
+    if (!bigWin || gap > bigWin.gap) bigWin = { ...m, gap };
+  });
+  let maxStreak = null;
+  S().joueurs.forEach(j => {
+    const ms = getMaxStreak(S().matchs, j);
+    if (!maxStreak || ms > maxStreak.n) maxStreak = { j, n: ms };
+  });
+  const parMois = {};
+  S().matchs.forEach(m => { parMois[m.mois] = (parMois[m.mois] || 0) + 1; });
+  let moisActif = null;
+  Object.entries(parMois).forEach(([mois, n]) => {
+    if (!moisActif || n > moisActif.n) moisActif = { mois: parseInt(mois), n };
+  });
+
+  const is1v1BW = bigWin && !bigWin.a2;
+  const bigWinLabel = bigWin ? `${is1v1BW ? bigWin.a1 : bigWin.a1+' & '+bigWin.a2} ${bigWin.ba} – ${bigWin.bb} ${is1v1BW ? bigWin.b1 : bigWin.b1+' & '+bigWin.b2}` : '—';
+
+  const recordsHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem">
+      ${enForme ? `<div class="duo-stat-card" style="border-top:3px solid #16a34a"><div class="duo-stat-label">💪 L'homme en forme</div><div style="font-size:16px;font-weight:800">${enForme.j}</div><div style="font-size:11px;color:#6b7280">${enForme.ratio}% sur ses ${enForme.n} derniers matchs</div></div>` : ''}
+      ${bigWin ? `<div class="duo-stat-card" style="border-top:3px solid #f59e0b"><div class="duo-stat-label">💥 Plus grosse victoire</div><div style="font-size:13px;font-weight:700">${bigWinLabel}</div><div style="font-size:11px;color:#6b7280">Écart de ${bigWin.gap} buts</div></div>` : ''}
+      ${maxStreak && maxStreak.n >= 2 ? `<div class="duo-stat-card" style="border-top:3px solid #dc2626"><div class="duo-stat-label">🔥 Plus longue série</div><div style="font-size:16px;font-weight:800">${maxStreak.j}</div><div style="font-size:11px;color:#6b7280">${maxStreak.n} victoires d'affilée</div></div>` : ''}
+      ${moisActif ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Mois le plus actif</div><div style="font-size:16px;font-weight:800">${MOIS_NOMS[moisActif.mois]}</div><div style="font-size:11px;color:#6b7280">${moisActif.n} matchs joués</div></div>` : ''}
+    </div>`;
+
+  // ── Comparateur ──
+  const opts = '<option value="">— Joueur —</option>' + S().joueurs.map(j => `<option>${j}</option>`).join('');
+  const comparateurHTML = `
+    <div class="card form-card" style="margin-bottom:1.5rem">
+      <h3 class="card-title">⚔️ Comparateur de joueurs</h3>
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.75rem">
+        <select id="cmp-j1" class="form-select" style="flex:1;min-width:120px" onchange="renderComparateur()">${opts}</select>
+        <span style="font-weight:800;color:#9ca3af">VS</span>
+        <select id="cmp-j2" class="form-select" style="flex:1;min-width:120px" onchange="renderComparateur()">${opts}</select>
+      </div>
+      <div id="cmp-result"></div>
+    </div>`;
+
   content.innerHTML = `
+    ${recordsHTML}
+    ${comparateurHTML}
     <div style="margin-bottom:1.5rem">
       <h3 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Vainqueurs mensuels</h3>
       ${titresHTML || '<p style="color:#9ca3af;font-size:13px">Pas encore de données.</p>'}
@@ -488,6 +670,60 @@ function renderPalmares() {
       ${joueursHTML}
     </div>`;
 }
+
+function renderComparateur() {
+  const j1 = document.getElementById('cmp-j1').value;
+  const j2 = document.getElementById('cmp-j2').value;
+  const res = document.getElementById('cmp-result');
+  if (!j1 || !j2 || j1 === j2) { res.innerHTML = ''; return; }
+
+  const s1 = calcStats(S().matchs, j1);
+  const s2 = calcStats(S().matchs, j2);
+
+  // Confrontations directes (camps opposés)
+  const vs = S().matchs.filter(m => {
+    const is1v1 = !m.a2;
+    if (is1v1) return (m.a1===j1&&m.b1===j2)||(m.a1===j2&&m.b1===j1);
+    const j1inA = [m.a1,m.a2].includes(j1);
+    const j2inA = [m.a1,m.a2].includes(j2);
+    const j1inB = [m.b1,m.b2].includes(j1);
+    const j2inB = [m.b1,m.b2].includes(j2);
+    return (j1inA||j1inB) && (j2inA||j2inB) && (j1inA !== j2inA);
+  });
+  const sVs = calcStats(vs, j1);
+
+  // Ensemble (2v2 uniquement)
+  const ensemble = currentMode === '2v2' ? S().matchs.filter(m =>
+    ([m.a1,m.a2].includes(j1) && [m.a1,m.a2].includes(j2)) ||
+    ([m.b1,m.b2].includes(j1) && [m.b1,m.b2].includes(j2))
+  ) : [];
+  const sEns = ensemble.length ? calcStats(ensemble, j1) : null;
+
+  const bar = (v1, v2, label) => {
+    const total = v1 + v2 || 1;
+    const p1 = Math.round(v1/total*100);
+    return `<div style="margin-bottom:.75rem">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:3px">
+        <span style="color:#2563eb">${v1}</span><span style="color:#6b7280;font-size:11px">${label}</span><span style="color:#dc2626">${v2}</span>
+      </div>
+      <div style="display:flex;height:8px;border-radius:100px;overflow:hidden;background:#f3f4f6">
+        <div style="width:${p1}%;background:#3b82f6"></div>
+        <div style="flex:1;background:#ef4444"></div>
+      </div>
+    </div>`;
+  };
+
+  res.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;margin-bottom:1rem">
+      <span style="color:#2563eb">${j1}</span><span style="color:#dc2626">${j2}</span>
+    </div>
+    ${bar(s1.v, s2.v, 'Victoires (saison)')}
+    ${bar(s1.ratio, s2.ratio, 'Ratio %')}
+    ${vs.length ? bar(sVs.v, sVs.d, `Face-à-face (${vs.length} matchs)`) : '<p style="font-size:12px;color:#9ca3af;text-align:center">Jamais affrontés directement.</p>'}
+    ${sEns ? `<p style="font-size:12px;color:#6b7280;text-align:center;margin-top:.5rem">🤝 En duo ensemble : ${sEns.v}V – ${sEns.d}D (${sEns.ratio}%) sur ${ensemble.length} matchs</p>` : ''}
+  `;
+}
+window.renderComparateur = renderComparateur;
 
 function togglePlayerDetail(id) { const el = document.getElementById(id); if (el) el.classList.toggle('open'); }
 window.togglePlayerDetail = togglePlayerDetail;
@@ -732,8 +968,11 @@ function renderDuos2v2(matchs) {
     <div class="duo-stat-card"><div class="duo-stat-label">Moy. matchs/duo</div><div class="duo-stat-value">${avgMatchs}</div></div>`;
 
   document.getElementById('tbody-duos').innerHTML = duos.map(d => {
-    const prio = d.n===0?`<span class="badge-urgent">URGENT</span>`:d.ecart<-0.5?`<span class="badge-rattraper">Rattraper</span>`:'—';
-    return `<tr><td><strong>${d.j1}</strong> & <strong>${d.j2}</strong></td><td class="col-num">${d.n}</td><td class="col-num">${d.ecart>0?'+':''}${d.ecart}</td><td>${prio}</td></tr>`;
+    const hasPaused = paused.includes(d.j1) || paused.includes(d.j2);
+    const prio = hasPaused
+      ? `<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
+      : d.n===0?`<span class="badge-urgent">URGENT</span>`:d.ecart<-0.5?`<span class="badge-rattraper">Rattraper</span>`:'—';
+    return `<tr style="${hasPaused ? 'opacity:.55' : ''}"><td><strong>${d.j1}</strong> & <strong>${d.j2}</strong></td><td class="col-num">${d.n}</td><td class="col-num">${d.ecart>0?'+':''}${d.ecart}</td><td>${prio}</td></tr>`;
   }).join('');
 }
 
@@ -763,9 +1002,12 @@ function renderFaceAFace(matchs) {
     <div class="duo-stat-card"><div class="duo-stat-label">Total matchs</div><div class="duo-stat-value">${totalMatchs}</div></div>`;
 
   document.getElementById('tbody-duos').innerHTML = confrontations.map(c => {
-    const prio = c.n===0?`<span class="badge-urgent">Jamais joué</span>`:'—';
+    const hasPaused = paused.includes(c.j1) || paused.includes(c.j2);
+    const prio = hasPaused
+      ? `<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
+      : c.n===0?`<span class="badge-urgent">Jamais joué</span>`:'—';
     const ratioTd = c.n>0 ? `${c.ratioJ1}% pour ${c.j1}` : '—';
-    return `<tr><td><strong>${c.j1}</strong> vs <strong>${c.j2}</strong></td><td class="col-num">${c.n}</td><td class="col-num">${ratioTd}</td><td>${prio}</td></tr>`;
+    return `<tr style="${hasPaused ? 'opacity:.55' : ''}"><td><strong>${c.j1}</strong> vs <strong>${c.j2}</strong></td><td class="col-num">${c.n}</td><td class="col-num">${ratioTd}</td><td>${prio}</td></tr>`;
   }).join('');
 }
 
@@ -773,13 +1015,26 @@ function renderFaceAFace(matchs) {
 function renderJoueurs() {
   document.getElementById('players-grid').innerHTML = S().joueurs.map((j, i) => {
     const stats = calcStats(S().matchs, j);
-    return `<div class="player-card">
+    const isPaused = paused.includes(j);
+    return `<div class="player-card" style="${isPaused ? 'opacity:.55' : ''}">
       <div class="player-avatar">${j.slice(0,2).toUpperCase()}</div>
-      <div class="player-info"><div class="player-name">${j}</div><div class="player-matchs">${stats.matchs} matchs · ${stats.ratio}%</div></div>
+      <div class="player-info">
+        <div class="player-name">${j} ${isPaused ? '<span style="font-size:10px;background:#f3f4f6;color:#6b7280;padding:1px 7px;border-radius:100px;font-weight:600">⏸ EN PAUSE</span>' : ''}</div>
+        <div class="player-matchs">${stats.matchs} matchs · ${stats.ratio}%</div>
+      </div>
+      <button onclick="togglePause('${j}')" title="${isPaused ? 'Réactiver' : 'Mettre en pause'}" style="background:none;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px;padding:4px 8px;flex-shrink:0">${isPaused ? '▶️' : '⏸'}</button>
       <button class="player-remove" onclick="removeJoueur(${i})" title="Retirer ${j}">×</button>
     </div>`;
   }).join('');
 }
+
+async function togglePause(nom) {
+  if (paused.includes(nom)) paused = paused.filter(p => p !== nom);
+  else paused.push(nom);
+  await fbSet('/paused', paused);
+  renderJoueurs();
+}
+window.togglePause = togglePause;
 
 async function addJoueur() {
   const inp = document.getElementById('new-joueur');
