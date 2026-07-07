@@ -13,16 +13,16 @@
 <body>
 
   <!-- ÉCRAN MOT DE PASSE -->
-  <div id="password-screen" style="position:fixed;inset:0;background:#111827;z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem">
-    <div style="background:#1f2937;border:1px solid #374151;border-radius:14px;padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center">
+  <div id="password-screen" style="position:fixed;inset:0;background:#2b1d0e;z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#3d2812;border:1px solid #5d3a1c;border-radius:14px;padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center">
       <div style="font-size:48px;margin-bottom:1rem">⚽</div>
       <h1 style="color:#fff;font-size:20px;font-weight:700;margin-bottom:6px">Championnat Babyfoot</h1>
       <p style="color:#9ca3af;font-size:13px;margin-bottom:2rem">Entrez le mot de passe pour accéder au site</p>
       <input type="password" id="pwd-input" placeholder="Mot de passe"
-        style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #374151;background:#111827;color:#fff;font-size:15px;text-align:center;outline:none;margin-bottom:.75rem"
+        style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #5d3a1c;background:#2b1d0e;color:#fff;font-size:15px;text-align:center;outline:none;margin-bottom:.75rem"
         onkeydown="if(event.key==='Enter')checkPassword()">
       <button onclick="checkPassword()"
-        style="width:100%;padding:11px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">
+        style="width:100%;padding:11px;background:#c8102e;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">
         Accéder
       </button>
       <p id="pwd-error" style="color:#f87171;font-size:13px;margin-top:.75rem;display:none">Mot de passe incorrect.</p>
@@ -81,7 +81,7 @@
     </div>
   </header>
 
-  <div id="loading-overlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#0a2e1f,#14532d);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1.25rem">
+  <div id="loading-overlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#7a4d26,#503418);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:1.25rem">
     <div class="loader-ball">⚽</div>
     <div style="color:#fff;font-size:17px;font-weight:600;font-family:'Bebas Neue',sans-serif;letter-spacing:.1em">CHARGEMENT DU CHAMPIONNAT</div>
     <div class="loader-shimmer"></div>
@@ -130,7 +130,7 @@
         <span class="page-sub" id="saisie-sub">Match 2 contre 2</span>
       </div>
       <div class="card form-card">
-        <button class="btn" onclick="suggestMatch()" style="width:100%;margin-bottom:1.25rem;border:1px dashed #16a34a;color:#16a34a;background:#f0fdf4;font-weight:600">🎲 Proposer un match équilibré</button>
+        <button class="btn" onclick="suggestMatch()" style="width:100%;margin-bottom:1.25rem;border:1px dashed #c8102e;color:#c8102e;background:rgba(200,16,46,.05);font-weight:600">🎲 Proposer un match équilibré</button>
         <div class="form-section">
           <label class="form-label">Mois</label>
           <select id="s-mois" class="form-select"></select>
