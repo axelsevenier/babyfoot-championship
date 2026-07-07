@@ -317,14 +317,16 @@ function renderGeneral() {
   const medals = ['🥇','🥈','🥉'];
   const rankClasses = ['rank-1','rank-2','rank-3'];
 
+  const places = ['1ER', '2E', '3E'];
   document.getElementById('podium-row').innerHTML = top3.map((r, i) =>
-    `<div class="podium-card ${rankClasses[i]}">
+    `<div class="podium-card pos-${i+1}" data-place="${places[i]}">
       <div class="podium-medal">${medals[i]}</div>
       <div class="podium-name">${r.j}</div>
-      <div class="podium-ratio">${r.ratio}%</div>
+      <div class="podium-ratio" data-target="${r.ratio}">0%</div>
       <div class="podium-stats">${r.v}V · ${r.d}D · ${r.matchs} matchs</div>
     </div>`
   ).join('');
+  animateCounters();
 
   const evo = getRankEvolution(S().matchs, S().joueurs);
   document.getElementById('tbody-general').innerHTML = rows.map((r, i) => {
@@ -332,12 +334,12 @@ function renderGeneral() {
     const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
     const diffStr = r.diff > 0 ? '+' + r.diff : r.diff;
     const e = evo[r.j] || 0;
-    const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:11px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:11px">▼</span>' : '<span style="color:#d1d5db;font-size:11px">–</span>';
+    const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:11px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:11px">▼</span>' : '<span style="color:var(--gray-300);font-size:11px">–</span>';
     const streak = getStreak(S().matchs, r.j);
     const streakBadge = streak >= 3 ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600">🔥${streak}</span>` : '';
     return `<tr>
       <td class="col-rank">${medal} ${evoIcon}</td>
-      <td style="font-weight:600;cursor:pointer" onclick="showPlayerDetail('${r.j}')">${r.j}${streakBadge} <span style="font-size:10px;color:#9ca3af">↗</span></td>
+      <td style="font-weight:600;cursor:pointer" onclick="showPlayerDetail('${r.j}')">${r.j}${streakBadge} <span style="font-size:10px;color:var(--gray-400)">↗</span></td>
       <td class="col-num">${r.v}</td>
       <td class="col-num">${r.d}</td>
       <td class="col-num">${r.matchs}</td>
@@ -519,6 +521,7 @@ async function saveMatch() {
   updateWinnerPreview();
   msg.textContent = '✓ Match enregistré !'; msg.className = 'save-msg';
   btn.disabled = false; btn.textContent = 'Enregistrer le match';
+  launchConfetti();
   setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 window.saveMatch = saveMatch;
@@ -558,7 +561,7 @@ function renderMensuel(mois) {
           const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:10px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:10px">▼</span>' : '';
           return `<tr><td class="col-rank">${medal}${evoIcon}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
         }).join(''); })()}
-        ${nonClass.length ? `<tr><td colspan="7" style="font-size:11px;color:#9ca3af;padding-top:10px">N/C (< ${minM} matchs) : ${nonClass.join(', ')}</td></tr>` : ''}
+        ${nonClass.length ? `<tr><td colspan="7" style="font-size:11px;color:var(--gray-400);padding-top:10px">N/C (< ${minM} matchs) : ${nonClass.join(', ')}</td></tr>` : ''}
       </tbody></table>
     </div>`;
 }
@@ -625,21 +628,21 @@ function renderPalmares() {
 
     return `<div class="player-detail-card">
       <div class="player-detail-header" onclick="togglePlayerDetail('pd-${j}')">
-        <div class="player-avatar" style="width:38px;height:38px;border-radius:50%;background:#dcfce7;color:#14532d;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${j.slice(0,2).toUpperCase()}</div>
+        <div class="player-avatar" style="width:40px;height:40px;${avatarStyle(j)}">${j.slice(0,2).toUpperCase()}</div>
         <div style="flex:1">
           <div style="font-weight:700;font-size:15px">${j}</div>
-          <div style="font-size:12px;color:#6b7280">${globalStats.v}V · ${globalStats.d}D · ${globalStats.ratio}% sur la saison</div>
+          <div style="font-size:12px;color:var(--text-soft)">${globalStats.v}V · ${globalStats.d}D · ${globalStats.ratio}% sur la saison</div>
         </div>
-        <span style="color:#9ca3af;font-size:18px">▸</span>
+        <span style="color:var(--gray-400);font-size:18px">▸</span>
       </div>
       <div class="player-detail-body" id="pd-${j}">
         <div style="margin-bottom:1rem">
-          <div style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Évolution mensuelle</div>
-          ${ratiosBars || '<p style="font-size:12px;color:#9ca3af">Pas assez de données.</p>'}
+          <div style="font-size:11px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.5rem">Évolution mensuelle</div>
+          ${ratiosBars || '<p style="font-size:12px;color:var(--gray-400)">Pas assez de données.</p>'}
         </div>
         <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-          ${meilleurDuo ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Meilleur duo</div><div style="font-size:15px;font-weight:700">${meilleurDuo.j} <span style="font-size:12px;color:#6b7280">(${meilleurDuo.ratio}%)</span></div></div>` : ''}
-          ${pireAdversaire ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Adversaire difficile</div><div style="font-size:15px;font-weight:700">${pireAdversaire.j} <span style="font-size:12px;color:#6b7280">(${pireAdversaire.ratio}%)</span></div></div>` : ''}
+          ${meilleurDuo ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Meilleur duo</div><div style="font-size:15px;font-weight:700">${meilleurDuo.j} <span style="font-size:12px;color:var(--text-soft)">(${meilleurDuo.ratio}%)</span></div></div>` : ''}
+          ${pireAdversaire ? `<div class="duo-stat-card" style="flex:1;min-width:120px"><div class="duo-stat-label">Adversaire difficile</div><div style="font-size:15px;font-weight:700">${pireAdversaire.j} <span style="font-size:12px;color:var(--text-soft)">(${pireAdversaire.ratio}%)</span></div></div>` : ''}
         </div>
       </div>
     </div>`;
@@ -684,7 +687,7 @@ function renderPalmares() {
   ).join('');
   const filterHTML = `
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
-      <label style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">Filtrer records & comparateur :</label>
+      <label style="font-size:12px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em">Filtrer records & comparateur :</label>
       <select class="form-select" style="width:auto;min-width:160px" onchange="setPalmaresFilter(this.value)">${moisFilterOptions}</select>
     </div>`;
 
@@ -692,10 +695,10 @@ function renderPalmares() {
 
   const recordsHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1.5rem">
-      ${enForme ? `<div class="duo-stat-card" style="border-top:3px solid #16a34a"><div class="duo-stat-label">💪 L'homme en forme${periodLabel}</div><div style="font-size:16px;font-weight:800">${enForme.j}</div><div style="font-size:11px;color:#6b7280">${enForme.ratio}% sur ses ${enForme.n} derniers matchs</div></div>` : ''}
-      ${bigWin ? `<div class="duo-stat-card" style="border-top:3px solid #f59e0b"><div class="duo-stat-label">💥 Plus grosse victoire${periodLabel}</div><div style="font-size:13px;font-weight:700">${bigWinLabel}</div><div style="font-size:11px;color:#6b7280">Écart de ${bigWin.gap} buts</div></div>` : ''}
-      ${maxStreak && maxStreak.n >= 2 ? `<div class="duo-stat-card" style="border-top:3px solid #dc2626"><div class="duo-stat-label">🔥 Plus longue série${periodLabel}</div><div style="font-size:16px;font-weight:800">${maxStreak.j}</div><div style="font-size:11px;color:#6b7280">${maxStreak.n} victoires d'affilée</div></div>` : ''}
-      ${moisActif && palmaresMoisFilter === '' ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Mois le plus actif</div><div style="font-size:16px;font-weight:800">${MOIS_NOMS[moisActif.mois]}</div><div style="font-size:11px;color:#6b7280">${moisActif.n} matchs joués</div></div>` : ''}
+      ${enForme ? `<div class="duo-stat-card" style="border-top:3px solid #16a34a"><div class="duo-stat-label">💪 L'homme en forme${periodLabel}</div><div style="font-size:16px;font-weight:800">${enForme.j}</div><div style="font-size:11px;color:var(--text-soft)">${enForme.ratio}% sur ses ${enForme.n} derniers matchs</div></div>` : ''}
+      ${bigWin ? `<div class="duo-stat-card" style="border-top:3px solid #f59e0b"><div class="duo-stat-label">💥 Plus grosse victoire${periodLabel}</div><div style="font-size:13px;font-weight:700">${bigWinLabel}</div><div style="font-size:11px;color:var(--text-soft)">Écart de ${bigWin.gap} buts</div></div>` : ''}
+      ${maxStreak && maxStreak.n >= 2 ? `<div class="duo-stat-card" style="border-top:3px solid #dc2626"><div class="duo-stat-label">🔥 Plus longue série${periodLabel}</div><div style="font-size:16px;font-weight:800">${maxStreak.j}</div><div style="font-size:11px;color:var(--text-soft)">${maxStreak.n} victoires d'affilée</div></div>` : ''}
+      ${moisActif && palmaresMoisFilter === '' ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Mois le plus actif</div><div style="font-size:16px;font-weight:800">${MOIS_NOMS[moisActif.mois]}</div><div style="font-size:11px;color:var(--text-soft)">${moisActif.n} matchs joués</div></div>` : ''}
       ${moisActif && palmaresMoisFilter !== '' ? `<div class="duo-stat-card" style="border-top:3px solid #2563eb"><div class="duo-stat-label">📅 Matchs joués${periodLabel}</div><div style="font-size:16px;font-weight:800">${moisActif.n}</div></div>` : ''}
     </div>`;
 
@@ -706,7 +709,7 @@ function renderPalmares() {
       <h3 class="card-title">⚔️ Comparateur de joueurs</h3>
       <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.75rem">
         <select id="cmp-j1" class="form-select" style="flex:1;min-width:120px" onchange="renderComparateur()">${opts}</select>
-        <span style="font-weight:800;color:#9ca3af">VS</span>
+        <span style="font-weight:800;color:var(--gray-400)">VS</span>
         <select id="cmp-j2" class="form-select" style="flex:1;min-width:120px" onchange="renderComparateur()">${opts}</select>
       </div>
       <div id="cmp-result"></div>
@@ -717,11 +720,11 @@ function renderPalmares() {
     ${recordsHTML}
     ${comparateurHTML}
     <div style="margin-bottom:1.5rem">
-      <h3 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Vainqueurs mensuels</h3>
-      ${titresHTML || '<p style="color:#9ca3af;font-size:13px">Pas encore de données.</p>'}
+      <h3 style="font-size:13px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Vainqueurs mensuels</h3>
+      ${titresHTML || '<p style="color:var(--gray-400);font-size:13px">Pas encore de données.</p>'}
     </div>
     <div>
-      <h3 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Fiche par joueur</h3>
+      <h3 style="font-size:13px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem">Fiche par joueur</h3>
       ${joueursHTML}
     </div>`;
 }
@@ -760,9 +763,9 @@ function renderComparateur() {
     const p1 = Math.round(v1/total*100);
     return `<div style="margin-bottom:.75rem">
       <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:3px">
-        <span style="color:#2563eb">${v1}</span><span style="color:#6b7280;font-size:11px">${label}</span><span style="color:#dc2626">${v2}</span>
+        <span style="color:#2563eb">${v1}</span><span style="color:var(--text-soft);font-size:11px">${label}</span><span style="color:#dc2626">${v2}</span>
       </div>
-      <div style="display:flex;height:8px;border-radius:100px;overflow:hidden;background:#f3f4f6">
+      <div style="display:flex;height:8px;border-radius:100px;overflow:hidden;background:var(--gray-100)">
         <div style="width:${p1}%;background:#3b82f6"></div>
         <div style="flex:1;background:#ef4444"></div>
       </div>
@@ -775,8 +778,8 @@ function renderComparateur() {
     </div>
     ${bar(s1.v, s2.v, palmaresMoisFilter === '' ? 'Victoires (saison)' : 'Victoires (' + MOIS_NOMS[parseInt(palmaresMoisFilter)] + ')')}
     ${bar(s1.ratio, s2.ratio, 'Ratio %')}
-    ${vs.length ? bar(sVs.v, sVs.d, `Face-à-face (${vs.length} matchs)`) : '<p style="font-size:12px;color:#9ca3af;text-align:center">Jamais affrontés directement.</p>'}
-    ${sEns ? `<p style="font-size:12px;color:#6b7280;text-align:center;margin-top:.5rem">🤝 En duo ensemble : ${sEns.v}V – ${sEns.d}D (${sEns.ratio}%) sur ${ensemble.length} matchs</p>` : ''}
+    ${vs.length ? bar(sVs.v, sVs.d, `Face-à-face (${vs.length} matchs)`) : '<p style="font-size:12px;color:var(--gray-400);text-align:center">Jamais affrontés directement.</p>'}
+    ${sEns ? `<p style="font-size:12px;color:var(--text-soft);text-align:center;margin-top:.5rem">🤝 En duo ensemble : ${sEns.v}V – ${sEns.d}D (${sEns.ratio}%) sur ${ensemble.length} matchs</p>` : ''}
   `;
 }
 window.renderComparateur = renderComparateur;
@@ -870,8 +873,8 @@ function renderHistory() {
     const scoreB = !vA ? `<strong>${m.bb}</strong>` : m.bb;
     const actions = m._id ? `
       <div style="display:flex;gap:4px;margin-left:auto">
-        <button onclick="openEditModal('${m._id}')" style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:500">✏️ Modifier</button>
-        <button onclick="deleteMatch('${m._id}')" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer">×</button>
+        <button onclick="openEditModal('${m._id}')" style="background:var(--blue-light);border:1px solid #bfdbfe;color:#2563eb;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:500">✏️ Modifier</button>
+        <button onclick="deleteMatch('${m._id}')" style="background:var(--red-light);border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:13px;cursor:pointer">×</button>
       </div>` : '';
     return `<div class="match-card">
       <span class="match-month">${MOIS_COURT[m.mois]}</span>
@@ -1026,7 +1029,7 @@ function renderDuos2v2(matchs) {
   document.getElementById('tbody-duos').innerHTML = duos.map(d => {
     const hasPaused = paused.includes(d.j1) || paused.includes(d.j2);
     const prio = hasPaused
-      ? `<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
+      ? `<span style="font-size:11px;background:var(--gray-100);color:var(--text-soft);padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
       : d.n===0?`<span class="badge-urgent">URGENT</span>`:d.ecart<-0.5?`<span class="badge-rattraper">Rattraper</span>`:'—';
     return `<tr style="${hasPaused ? 'opacity:.55' : ''}"><td><strong>${d.j1}</strong> & <strong>${d.j2}</strong></td><td class="col-num">${d.n}</td><td class="col-num">${d.ecart>0?'+':''}${d.ecart}</td><td>${prio}</td></tr>`;
   }).join('');
@@ -1060,7 +1063,7 @@ function renderFaceAFace(matchs) {
   document.getElementById('tbody-duos').innerHTML = confrontations.map(c => {
     const hasPaused = paused.includes(c.j1) || paused.includes(c.j2);
     const prio = hasPaused
-      ? `<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
+      ? `<span style="font-size:11px;background:var(--gray-100);color:var(--text-soft);padding:2px 8px;border-radius:100px;font-weight:600">⏸ pause</span>`
       : c.n===0?`<span class="badge-urgent">Jamais joué</span>`:'—';
     const ratioTd = c.n>0 ? `${c.ratioJ1}% pour ${c.j1}` : '—';
     return `<tr style="${hasPaused ? 'opacity:.55' : ''}"><td><strong>${c.j1}</strong> vs <strong>${c.j2}</strong></td><td class="col-num">${c.n}</td><td class="col-num">${ratioTd}</td><td>${prio}</td></tr>`;
@@ -1073,12 +1076,12 @@ function renderJoueurs() {
     const stats = calcStats(S().matchs, j);
     const isPaused = paused.includes(j);
     return `<div class="player-card" style="${isPaused ? 'opacity:.55' : ''}">
-      <div class="player-avatar">${j.slice(0,2).toUpperCase()}</div>
+      <div class="player-avatar" style="${avatarStyle(j)}">${j.slice(0,2).toUpperCase()}</div>
       <div class="player-info">
-        <div class="player-name">${j} ${isPaused ? '<span style="font-size:10px;background:#f3f4f6;color:#6b7280;padding:1px 7px;border-radius:100px;font-weight:600">⏸ EN PAUSE</span>' : ''}</div>
+        <div class="player-name">${j} ${isPaused ? '<span style="font-size:10px;background:var(--gray-100);color:var(--text-soft);padding:1px 7px;border-radius:100px;font-weight:600">⏸ EN PAUSE</span>' : ''}</div>
         <div class="player-matchs">${stats.matchs} matchs · ${stats.ratio}%</div>
       </div>
-      <button onclick="togglePause('${j}')" title="${isPaused ? 'Réactiver' : 'Mettre en pause'}" style="background:none;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px;padding:4px 8px;flex-shrink:0">${isPaused ? '▶️' : '⏸'}</button>
+      <button onclick="togglePause('${j}')" title="${isPaused ? 'Réactiver' : 'Mettre en pause'}" style="background:none;border:1px solid var(--gray-200);border-radius:6px;cursor:pointer;font-size:13px;padding:4px 8px;flex-shrink:0">${isPaused ? '▶️' : '⏸'}</button>
       <button class="player-remove" onclick="removeJoueur(${i})" title="Retirer ${j}">×</button>
     </div>`;
   }).join('');
@@ -1128,6 +1131,62 @@ const renders = {
   duos: renderDuos,
   joueurs: renderJoueurs,
 };
+
+// ─── Thème sombre ─────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+  const cur = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  applyTheme(cur);
+  try { localStorage.setItem('bf_theme', cur); } catch(e) {}
+}
+window.toggleTheme = toggleTheme;
+
+try { applyTheme(localStorage.getItem('bf_theme') || 'light'); } catch(e) {}
+
+// ─── Confettis ────────────────────────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#f5b301','#16a34a','#2563eb','#dc2626','#a855f7','#f97316'];
+  for (let i = 0; i < 60; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+    c.style.animationDelay = (Math.random() * .4) + 's';
+    c.style.borderRadius = Math.random() < .5 ? '50%' : '2px';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 3800);
+  }
+}
+
+// ─── Avatars colorés par joueur ───────────────────────────────────────────────
+function avatarStyle(nom) {
+  let hash = 0;
+  for (let i = 0; i < nom.length; i++) hash = nom.charCodeAt(i) + ((hash << 5) - hash);
+  const hue = Math.abs(hash) % 360;
+  return `background:hsl(${hue},62%,88%);color:hsl(${hue},55%,28%)`;
+}
+
+// ─── Compteurs animés ─────────────────────────────────────────────────────────
+function animateCounters() {
+  document.querySelectorAll('.podium-ratio[data-target]').forEach(el => {
+    const target = parseInt(el.dataset.target);
+    const start = performance.now();
+    const dur = 900;
+    function tick(now) {
+      const p = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased) + '%';
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 initFirebase();
