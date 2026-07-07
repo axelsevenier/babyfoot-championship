@@ -247,10 +247,18 @@ function getMaxStreak(matchs, joueur) {
   return max;
 }
 
-// Évolution du rang : compare avec le classement sans les 5 derniers matchs
+// Évolution du rang : compare avec le classement avant le dernier jour joué
 function getRankEvolution(matchs, joueurs) {
   const current = defaultRanking(matchs, joueurs, 0);
-  const prevMatchs = matchs.slice(0, Math.max(0, matchs.length - 5));
+  const dates = matchs.map(m => m.date).filter(Boolean);
+  let prevMatchs;
+  if (dates.length) {
+    const lastDay = dates.sort()[dates.length - 1];
+    prevMatchs = matchs.filter(m => m.date !== lastDay);
+  } else {
+    // Fallback si aucun match n'a de date : on retire les 5 derniers
+    prevMatchs = matchs.slice(0, Math.max(0, matchs.length - 5));
+  }
   const previous = defaultRanking(prevMatchs, joueurs, 0);
   const evo = {};
   current.forEach((r, i) => {
