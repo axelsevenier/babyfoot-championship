@@ -234,18 +234,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => showPage(btn.dataset.page));
 });
 
-// Swipe
-let touchStartX = 0;
-const mainEl = document.getElementById('main-swipe');
-mainEl.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
-mainEl.addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if (Math.abs(dx) < 60) return;
-  const active = document.querySelector('.page.active')?.id?.replace('page-','');
-  const idx = PAGE_ORDER.indexOf(active);
-  if (dx < 0 && idx < PAGE_ORDER.length - 1) showPage(PAGE_ORDER[idx + 1]);
-  if (dx > 0 && idx > 0) showPage(PAGE_ORDER[idx - 1]);
-}, { passive: true });
+
 
 // Tri
 function sortBy(col) {
@@ -294,17 +283,17 @@ function renderSaisie() {
   const moisSel = document.getElementById('s-mois');
   moisSel.innerHTML = MOIS_NOMS.map((m,i) => `<option value="${i}">${m}</option>`).join('');
   moisSel.value = new Date().getMonth();
-  const opts = S().joueurs.map(j => `<option>${j}</option>`).join('');
+  const opts = '<option value="">— Choisir —</option>' + S().joueurs.map(j => `<option>${j}</option>`).join('');
 
   if (currentMode === '2v2') {
-    ['s-a1','s-a2','s-b1','s-b2'].forEach((id, idx) => {
+    ['s-a1','s-a2','s-b1','s-b2'].forEach(id => {
       document.getElementById(id).innerHTML = opts;
-      document.getElementById(id).value = S().joueurs[idx] || S().joueurs[0];
+      document.getElementById(id).value = '';
     });
   } else {
-    ['s-1a','s-1b'].forEach((id, idx) => {
+    ['s-1a','s-1b'].forEach(id => {
       document.getElementById(id).innerHTML = opts;
-      document.getElementById(id).value = S().joueurs[idx] || S().joueurs[0];
+      document.getElementById(id).value = '';
     });
   }
   const dateEl = document.getElementById('s-date');
