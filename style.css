@@ -538,7 +538,7 @@ main {
 /* PLAYERS */
 .players-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: .75rem;
   margin-bottom: 1.25rem;
 }
@@ -569,8 +569,8 @@ main {
 }
 
 .player-info { flex: 1; min-width: 0; }
-.player-name { font-weight: 600; font-size: 14px; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-matchs { font-size: 11px; color: var(--gray-500); }
+.player-name { font-weight: 600; font-size: 14px; color: var(--gray-900); }
+.player-matchs { font-size: 11px; color: var(--gray-500); white-space: nowrap; }
 
 .player-remove {
   background: none;
