@@ -612,6 +612,12 @@ main {
   .nav-btn { min-width: 40px; }
   .podium-row { flex-direction: column; }
   .podium-card { min-width: unset; }
+
+  /* Tableau classement mensuel : colonnes compactes pour tout afficher */
+  .ranking-table th, .ranking-table td { padding: 6px 3px; font-size: 11px; }
+  .ranking-table th { letter-spacing: 0; }
+  .col-rank { width: 22px; }
+  .col-num { width: 30px; }
 }
 
 /* ─── Nouvelles évolutions ────────────────────────────────────────────────── */
