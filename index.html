@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=91">
+  <link rel="stylesheet" href="style.css?v=94">
 </head>
 <body>
 
@@ -101,7 +101,7 @@
     <section id="page-general" class="page">
       <div class="page-header">
         <h2>Classement général</h2>
-        <span class="page-sub">Cumul toute la saison</span>
+        <span class="page-sub">Cumul toute la saison · min. 10 matchs pour figurer dans le haut du tableau</span>
         <button class="btn btn-primary" onclick="showPage('saisie')" style="margin-left:auto;padding:7px 16px;font-size:13px">➕ Match</button>
       </div>
       <div class="podium-row" id="podium-row"></div>
@@ -208,7 +208,7 @@
 
     <!-- PAGE MENSUEL -->
     <section id="page-mensuel" class="page active">
-      <div class="page-header"><h2>Classements mensuels</h2><span class="page-sub">Min. 3 matchs pour être classé</span></div>
+      <div class="page-header"><h2>Classements mensuels</h2><span class="page-sub" id="mensuel-sub">Min. 7 matchs pour être classé</span></div>
       <div class="month-pills" id="month-pills"></div>
       <div id="mensuel-content"></div>
     </section>
@@ -337,6 +337,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=91"></script>
+  <script src="app.js?v=94"></script>
 </body>
 </html>
