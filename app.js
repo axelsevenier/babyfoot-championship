@@ -378,6 +378,7 @@ function renderSaisie() {
   }
   const dateEl = document.getElementById('s-date');
   if (!dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  showSuggestInfo('');
   updateWinnerPreview();
 }
 
@@ -404,6 +405,21 @@ function duoCount(matchs, j1, j2) {
 
 function confrontCount(matchs, j1, j2) {
   return matchs.filter(m => (m.a1===j1&&m.b1===j2)||(m.a1===j2&&m.b1===j1)).length;
+}
+
+// Nombre de fois où j1 et j2 se sont affrontés (camps opposés) en 2v2
+function oppCount(matchs, j1, j2) {
+  return matchs.filter(m => {
+    const aSide = [m.a1, m.a2], bSide = [m.b1, m.b2];
+    return (aSide.includes(j1) && bSide.includes(j2)) || (bSide.includes(j1) && aSide.includes(j2));
+  }).length;
+}
+
+function showSuggestInfo(txt) {
+  const el = document.getElementById('suggest-info');
+  if (!el) return;
+  el.textContent = txt;
+  el.style.display = txt ? 'block' : 'none';
 }
 
 // Index de rotation des suggestions (réinitialisé quand le contexte change)
@@ -435,17 +451,32 @@ function suggestMatch() {
         [[quad[0],quad[3]],[quad[1],quad[2]]],
       ];
       splits.forEach(([tA, tB]) => {
-        const score = duoCount(matchsMois, tA[0], tA[1]) + duoCount(matchsMois, tB[0], tB[1]);
-        options.push({ tA, tB, score });
+        // 2 paires de coéquipiers
+        const duos = [duoCount(matchsMois, tA[0], tA[1]), duoCount(matchsMois, tB[0], tB[1])];
+        // 4 paires d'adversaires
+        const opps = [
+          oppCount(matchsMois, tA[0], tB[0]), oppCount(matchsMois, tA[0], tB[1]),
+          oppCount(matchsMois, tA[1], tB[0]), oppCount(matchsMois, tA[1], tB[1]),
+        ];
+        const duoSum = duos[0] + duos[1];
+        const oppSum = opps.reduce((s, n) => s + n, 0);
+        // Coéquipiers et adversaires pèsent autant (2 paires duo vs 4 paires adverses)
+        const score = 2 * duoSum + oppSum;
+        // Départage : éviter de reformer la paire la plus déjà vue
+        const maxRepeat = Math.max(...duos, ...opps);
+        const newPairs = duos.filter(n => n === 0).length + opps.filter(n => n === 0).length;
+        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps });
       });
     }
-    options.sort((x, y) => x.score - y.score);
+    options.sort((x, y) => x.score - y.score || x.maxRepeat - y.maxRepeat || y.newPairs - x.newPairs);
     const pick = options[suggestIdx % options.length];
+    const rank = (suggestIdx % options.length) + 1;
     suggestIdx++;
     document.getElementById('s-a1').value = pick.tA[0];
     document.getElementById('s-a2').value = pick.tA[1];
     document.getElementById('s-b1').value = pick.tB[0];
     document.getElementById('s-b2').value = pick.tB[1];
+    showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6`);
   } else {
     if (actifs.length < 2) { alert('Il faut au moins 2 joueurs actifs (hors pause).'); return; }
     const options = [];
@@ -455,9 +486,11 @@ function suggestMatch() {
     }
     options.sort((x, y) => x.n - y.n);
     const pick = options[suggestIdx % options.length];
+    const rank = (suggestIdx % options.length) + 1;
     suggestIdx++;
     document.getElementById('s-1a').value = pick.j1;
     document.getElementById('s-1b').value = pick.j2;
+    showSuggestInfo(`Proposition ${rank}/${options.length} · ${pick.j1} vs ${pick.j2} : ${pick.n} confrontation(s) ce mois`);
   }
   updateWinnerPreview();
 }
