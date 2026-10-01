@@ -389,6 +389,13 @@ function adjustScore(id, delta) {
 }
 window.adjustScore = adjustScore;
 
+function syncChips() {
+  document.querySelectorAll('.score-chip').forEach(chip => {
+    const input = document.getElementById(chip.dataset.for);
+    chip.classList.toggle('active', !!input && String(parseInt(input.value) || 0) === chip.dataset.val);
+  });
+}
+
 function setScore(id, val) {
   document.getElementById(id).value = val;
   updateWinnerPreview();
@@ -512,6 +519,7 @@ Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}
 window.suggestMatch = suggestMatch;
 
 function updateWinnerPreview() {
+  syncChips();
   const preview = document.getElementById('winner-preview');
   if (!preview) return;
   let ba, bb, labelA, labelB;
@@ -1008,6 +1016,7 @@ function openEditModal(id) {
   }
   document.getElementById('e-date').value = m.date || '';
   document.getElementById('e-msg').textContent = '';
+  syncChips();
   document.getElementById('edit-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
