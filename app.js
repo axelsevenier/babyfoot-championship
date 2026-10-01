@@ -431,9 +431,16 @@ function suggestMatch() {
   // Équilibrage basé sur le mois sélectionné dans le formulaire de saisie
   const moisCible = parseInt(document.getElementById('s-mois')?.value ?? new Date().getMonth());
   const matchsMois = S().matchs.filter(m => m.mois === moisCible);
+  // Équilibrage du nombre de matchs par joueur sur la journée (date du formulaire)
+  const jour = document.getElementById('s-date')?.value || new Date().toISOString().split('T')[0];
+  const matchsJour = S().matchs.filter(m => m.date === jour);
+  const nbJour = {};
+  actifs.forEach(j => {
+    nbJour[j] = matchsJour.filter(m => (currentMode === '1v1' ? [m.a1, m.b1] : [m.a1, m.a2, m.b1, m.b2]).includes(j)).length;
+  });
 
-  // Si le contexte change (mode, mois, joueurs, nb matchs), on repart de la proposition n°1
-  const key = `${currentMode}|${moisCible}|${actifs.join(',')}|${matchsMois.length}`;
+  // Si le contexte change (mode, mois, jour, joueurs, nb matchs), on repart de la proposition n°1
+  const key = `${currentMode}|${moisCible}|${jour}|${actifs.join(',')}|${matchsMois.length}|${matchsJour.length}`;
   if (key !== suggestKey) { suggestKey = key; suggestIdx = 0; }
 
   if (currentMode === '2v2') {
@@ -465,10 +472,13 @@ function suggestMatch() {
         // Départage : éviter de reformer la paire la plus déjà vue
         const maxRepeat = Math.max(...duos, ...opps);
         const newPairs = duos.filter(n => n === 0).length + opps.filter(n => n === 0).length;
-        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps });
+        // Charge du jour : on fait jouer en priorité ceux qui ont le moins joué aujourd'hui
+        const dayLoad = quad.reduce((s, j) => s + nbJour[j], 0);
+        const dayMax = Math.max(...quad.map(j => nbJour[j]));
+        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps, dayLoad, dayMax });
       });
     }
-    options.sort((x, y) => x.score - y.score || x.maxRepeat - y.maxRepeat || y.newPairs - x.newPairs);
+    options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.score - y.score || x.maxRepeat - y.maxRepeat || y.newPairs - x.newPairs);
     const pick = options[suggestIdx % options.length];
     const rank = (suggestIdx % options.length) + 1;
     suggestIdx++;
@@ -476,21 +486,26 @@ function suggestMatch() {
     document.getElementById('s-a2').value = pick.tA[1];
     document.getElementById('s-b1').value = pick.tB[0];
     document.getElementById('s-b2').value = pick.tB[1];
-    showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6`);
+    const repos = actifs.filter(j => ![...pick.tA, ...pick.tB].includes(j));
+    showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6
+Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}${repos.length ? ` — au repos : ${repos.join(', ')}` : ''}`);
   } else {
     if (actifs.length < 2) { alert('Il faut au moins 2 joueurs actifs (hors pause).'); return; }
     const options = [];
     for (let i = 0; i < actifs.length; i++)
     for (let k = i+1; k < actifs.length; k++) {
-      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]) });
+      const dayLoad = nbJour[actifs[i]] + nbJour[actifs[k]];
+      const dayMax = Math.max(nbJour[actifs[i]], nbJour[actifs[k]]);
+      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax });
     }
-    options.sort((x, y) => x.n - y.n);
+    options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
     const pick = options[suggestIdx % options.length];
     const rank = (suggestIdx % options.length) + 1;
     suggestIdx++;
     document.getElementById('s-1a').value = pick.j1;
     document.getElementById('s-1b').value = pick.j2;
-    showSuggestInfo(`Proposition ${rank}/${options.length} · ${pick.j1} vs ${pick.j2} : ${pick.n} confrontation(s) ce mois`);
+    showSuggestInfo(`Proposition ${rank}/${options.length} · ${pick.j1} vs ${pick.j2} : ${pick.n} confrontation(s) ce mois
+Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}`);
   }
   updateWinnerPreview();
 }
