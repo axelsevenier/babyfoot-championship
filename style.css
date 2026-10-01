@@ -922,3 +922,36 @@ main {
   .score-input { width: 66px; font-size: 26px; }
   .match-score { font-size: 18px; }
 }
+
+/* ─── Scores rapides 0-10 ───────────────────────────────────────── */
+.score-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.score-chip {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: .03em;
+  cursor: pointer;
+  transition: all .12s;
+}
+.score-chip:hover { border-color: var(--bonzini-red); color: var(--bonzini-red); }
+.score-chip:active { transform: scale(.92); }
+.score-chip.active {
+  background: var(--bonzini-red);
+  border-color: var(--bonzini-red);
+  color: #fff;
+}
+.score-chip[data-val="10"] { min-width: 34px; font-weight: 700; }
+@media (max-width: 640px) {
+  .score-chip { min-width: 30px; height: 32px; font-size: 16px; }
+}
