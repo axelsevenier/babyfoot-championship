@@ -955,3 +955,48 @@ main {
 @media (max-width: 640px) {
   .score-chip { min-width: 30px; height: 32px; font-size: 16px; }
 }
+
+/* ─── Présents du jour ──────────────────────────────────────────── */
+.presence-block { margin-bottom: 1rem; }
+.presence-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.presence-count { font-size: 11px; color: var(--text-soft); font-weight: 600; }
+.presence-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.presence-chip {
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px dashed var(--gray-300);
+  background: transparent;
+  color: var(--gray-400);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-decoration: line-through;
+  transition: all .15s;
+}
+.presence-chip.active {
+  border: 1px solid var(--bonzini-blue);
+  background: var(--bonzini-blue);
+  color: #fff;
+  text-decoration: none;
+}
+.presence-chip:active { transform: scale(.95); }
+
+/* ─── Navigation des propositions ───────────────────────────────── */
+.suggest-nav { display: flex; gap: 6px; margin-bottom: 1.25rem; }
+.suggest-main, .suggest-arrow {
+  border: 1px dashed var(--bonzini-red);
+  color: var(--bonzini-red);
+  background: rgba(200,16,46,.05);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 10px 12px;
+  transition: all .15s;
+}
+.suggest-main { flex: 1; }
+.suggest-arrow { width: 46px; flex-shrink: 0; font-size: 13px; }
+.suggest-main:hover, .suggest-arrow:hover { background: rgba(200,16,46,.12); }
+.suggest-main:active, .suggest-arrow:active { transform: scale(.97); }
