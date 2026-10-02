@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=97">
+  <link rel="stylesheet" href="style.css?v=98">
 </head>
 <body>
 
@@ -130,7 +130,18 @@
         <span class="page-sub" id="saisie-sub">Match 2 contre 2</span>
       </div>
       <div class="card form-card">
-        <button class="btn" onclick="suggestMatch()" style="width:100%;margin-bottom:1.25rem;border:1px dashed #c8102e;color:#c8102e;background:rgba(200,16,46,.05);font-weight:600">🎲 Proposer un match équilibré</button>
+        <div class="presence-block">
+          <div class="presence-head">
+            <span class="form-label" style="margin:0">Présents aujourd'hui</span>
+            <span id="presence-count" class="presence-count"></span>
+          </div>
+          <div id="presence-chips" class="presence-chips"></div>
+        </div>
+        <div class="suggest-nav">
+          <button type="button" class="suggest-arrow" onclick="suggestMatch(-1)" title="Proposition précédente">◀</button>
+          <button type="button" class="suggest-main" onclick="suggestMatch(1)">🎲 Proposer un match équilibré</button>
+          <button type="button" class="suggest-arrow" onclick="suggestMatch(1)" title="Proposition suivante">▶</button>
+        </div>
         <div id="suggest-info" style="display:none;white-space:pre-line;line-height:1.6;font-size:11.5px;color:var(--text-soft);text-align:center;margin:-.75rem 0 1.25rem"></div>
         <div class="form-section">
           <label class="form-label">Mois</label>
@@ -145,9 +156,7 @@
               <div class="form-section"><label class="form-label">Joueur 2</label><select id="s-a2" class="form-select" onchange="updateWinnerPreview()"></select></div>
               <div class="form-section"><label class="form-label">Buts</label>
                 <div class="score-input-row">
-                  <button class="score-btn" onclick="adjustScore('s-ba',-1)">−</button>
                   <input type="number" id="s-ba" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
-                  <button class="score-btn" onclick="adjustScore('s-ba',1)">+</button>
                 </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="s-ba" data-val="0" onclick="setScore('s-ba',0)">0</button><button type="button" class="score-chip" data-for="s-ba" data-val="1" onclick="setScore('s-ba',1)">1</button><button type="button" class="score-chip" data-for="s-ba" data-val="2" onclick="setScore('s-ba',2)">2</button><button type="button" class="score-chip" data-for="s-ba" data-val="3" onclick="setScore('s-ba',3)">3</button><button type="button" class="score-chip" data-for="s-ba" data-val="4" onclick="setScore('s-ba',4)">4</button><button type="button" class="score-chip" data-for="s-ba" data-val="5" onclick="setScore('s-ba',5)">5</button><button type="button" class="score-chip" data-for="s-ba" data-val="6" onclick="setScore('s-ba',6)">6</button><button type="button" class="score-chip" data-for="s-ba" data-val="7" onclick="setScore('s-ba',7)">7</button><button type="button" class="score-chip" data-for="s-ba" data-val="8" onclick="setScore('s-ba',8)">8</button><button type="button" class="score-chip" data-for="s-ba" data-val="9" onclick="setScore('s-ba',9)">9</button><button type="button" class="score-chip" data-for="s-ba" data-val="10" onclick="setScore('s-ba',10)">10</button></div>
               </div>
@@ -159,9 +168,7 @@
               <div class="form-section"><label class="form-label">Joueur 2</label><select id="s-b2" class="form-select" onchange="updateWinnerPreview()"></select></div>
               <div class="form-section"><label class="form-label">Buts</label>
                 <div class="score-input-row">
-                  <button class="score-btn" onclick="adjustScore('s-bb',-1)">−</button>
                   <input type="number" id="s-bb" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
-                  <button class="score-btn" onclick="adjustScore('s-bb',1)">+</button>
                 </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="s-bb" data-val="0" onclick="setScore('s-bb',0)">0</button><button type="button" class="score-chip" data-for="s-bb" data-val="1" onclick="setScore('s-bb',1)">1</button><button type="button" class="score-chip" data-for="s-bb" data-val="2" onclick="setScore('s-bb',2)">2</button><button type="button" class="score-chip" data-for="s-bb" data-val="3" onclick="setScore('s-bb',3)">3</button><button type="button" class="score-chip" data-for="s-bb" data-val="4" onclick="setScore('s-bb',4)">4</button><button type="button" class="score-chip" data-for="s-bb" data-val="5" onclick="setScore('s-bb',5)">5</button><button type="button" class="score-chip" data-for="s-bb" data-val="6" onclick="setScore('s-bb',6)">6</button><button type="button" class="score-chip" data-for="s-bb" data-val="7" onclick="setScore('s-bb',7)">7</button><button type="button" class="score-chip" data-for="s-bb" data-val="8" onclick="setScore('s-bb',8)">8</button><button type="button" class="score-chip" data-for="s-bb" data-val="9" onclick="setScore('s-bb',9)">9</button><button type="button" class="score-chip" data-for="s-bb" data-val="10" onclick="setScore('s-bb',10)">10</button></div>
               </div>
@@ -176,9 +183,7 @@
               <div class="form-section"><label class="form-label">Joueur</label><select id="s-1a" class="form-select" onchange="updateWinnerPreview()"></select></div>
               <div class="form-section"><label class="form-label">Buts</label>
                 <div class="score-input-row">
-                  <button class="score-btn" onclick="adjustScore('s-1ba',-1)">−</button>
                   <input type="number" id="s-1ba" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
-                  <button class="score-btn" onclick="adjustScore('s-1ba',1)">+</button>
                 </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="s-1ba" data-val="0" onclick="setScore('s-1ba',0)">0</button><button type="button" class="score-chip" data-for="s-1ba" data-val="1" onclick="setScore('s-1ba',1)">1</button><button type="button" class="score-chip" data-for="s-1ba" data-val="2" onclick="setScore('s-1ba',2)">2</button><button type="button" class="score-chip" data-for="s-1ba" data-val="3" onclick="setScore('s-1ba',3)">3</button><button type="button" class="score-chip" data-for="s-1ba" data-val="4" onclick="setScore('s-1ba',4)">4</button><button type="button" class="score-chip" data-for="s-1ba" data-val="5" onclick="setScore('s-1ba',5)">5</button><button type="button" class="score-chip" data-for="s-1ba" data-val="6" onclick="setScore('s-1ba',6)">6</button><button type="button" class="score-chip" data-for="s-1ba" data-val="7" onclick="setScore('s-1ba',7)">7</button><button type="button" class="score-chip" data-for="s-1ba" data-val="8" onclick="setScore('s-1ba',8)">8</button><button type="button" class="score-chip" data-for="s-1ba" data-val="9" onclick="setScore('s-1ba',9)">9</button><button type="button" class="score-chip" data-for="s-1ba" data-val="10" onclick="setScore('s-1ba',10)">10</button></div>
               </div>
@@ -189,9 +194,7 @@
               <div class="form-section"><label class="form-label">Joueur</label><select id="s-1b" class="form-select" onchange="updateWinnerPreview()"></select></div>
               <div class="form-section"><label class="form-label">Buts</label>
                 <div class="score-input-row">
-                  <button class="score-btn" onclick="adjustScore('s-1bb',-1)">−</button>
                   <input type="number" id="s-1bb" min="0" max="20" value="0" class="score-input" oninput="updateWinnerPreview()">
-                  <button class="score-btn" onclick="adjustScore('s-1bb',1)">+</button>
                 </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="s-1bb" data-val="0" onclick="setScore('s-1bb',0)">0</button><button type="button" class="score-chip" data-for="s-1bb" data-val="1" onclick="setScore('s-1bb',1)">1</button><button type="button" class="score-chip" data-for="s-1bb" data-val="2" onclick="setScore('s-1bb',2)">2</button><button type="button" class="score-chip" data-for="s-1bb" data-val="3" onclick="setScore('s-1bb',3)">3</button><button type="button" class="score-chip" data-for="s-1bb" data-val="4" onclick="setScore('s-1bb',4)">4</button><button type="button" class="score-chip" data-for="s-1bb" data-val="5" onclick="setScore('s-1bb',5)">5</button><button type="button" class="score-chip" data-for="s-1bb" data-val="6" onclick="setScore('s-1bb',6)">6</button><button type="button" class="score-chip" data-for="s-1bb" data-val="7" onclick="setScore('s-1bb',7)">7</button><button type="button" class="score-chip" data-for="s-1bb" data-val="8" onclick="setScore('s-1bb',8)">8</button><button type="button" class="score-chip" data-for="s-1bb" data-val="9" onclick="setScore('s-1bb',9)">9</button><button type="button" class="score-chip" data-for="s-1bb" data-val="10" onclick="setScore('s-1bb',10)">10</button></div>
               </div>
@@ -199,7 +202,7 @@
           </div>
         </div>
         <div id="winner-preview" style="display:none;margin:.5rem 0 1rem;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;text-align:center;transition:all .2s"></div>
-        <div class="form-section"><label class="form-label">Date (optionnel)</label><input type="date" id="s-date" class="form-input"></div>
+        <div class="form-section"><label class="form-label">Date (optionnel)</label><input type="date" id="s-date" class="form-input" onchange="loadPresence()"></div>
         <div class="form-actions">
           <button class="btn btn-primary" onclick="saveMatch()">Enregistrer le match</button>
           <span id="s-msg" class="save-msg"></span>
@@ -277,9 +280,7 @@
             <div class="form-section"><label class="form-label">Joueur 2</label><select id="e-a2" class="form-select"></select></div>
             <div class="form-section"><label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('e-ba',-1)">−</button>
                 <input type="number" id="e-ba" min="0" max="20" class="score-input">
-                <button class="score-btn" onclick="adjustScore('e-ba',1)">+</button>
               </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="e-ba" data-val="0" onclick="setScore('e-ba',0)">0</button><button type="button" class="score-chip" data-for="e-ba" data-val="1" onclick="setScore('e-ba',1)">1</button><button type="button" class="score-chip" data-for="e-ba" data-val="2" onclick="setScore('e-ba',2)">2</button><button type="button" class="score-chip" data-for="e-ba" data-val="3" onclick="setScore('e-ba',3)">3</button><button type="button" class="score-chip" data-for="e-ba" data-val="4" onclick="setScore('e-ba',4)">4</button><button type="button" class="score-chip" data-for="e-ba" data-val="5" onclick="setScore('e-ba',5)">5</button><button type="button" class="score-chip" data-for="e-ba" data-val="6" onclick="setScore('e-ba',6)">6</button><button type="button" class="score-chip" data-for="e-ba" data-val="7" onclick="setScore('e-ba',7)">7</button><button type="button" class="score-chip" data-for="e-ba" data-val="8" onclick="setScore('e-ba',8)">8</button><button type="button" class="score-chip" data-for="e-ba" data-val="9" onclick="setScore('e-ba',9)">9</button><button type="button" class="score-chip" data-for="e-ba" data-val="10" onclick="setScore('e-ba',10)">10</button></div>
             </div>
@@ -291,9 +292,7 @@
             <div class="form-section"><label class="form-label">Joueur 2</label><select id="e-b2" class="form-select"></select></div>
             <div class="form-section"><label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('e-bb',-1)">−</button>
                 <input type="number" id="e-bb" min="0" max="20" class="score-input">
-                <button class="score-btn" onclick="adjustScore('e-bb',1)">+</button>
               </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="e-bb" data-val="0" onclick="setScore('e-bb',0)">0</button><button type="button" class="score-chip" data-for="e-bb" data-val="1" onclick="setScore('e-bb',1)">1</button><button type="button" class="score-chip" data-for="e-bb" data-val="2" onclick="setScore('e-bb',2)">2</button><button type="button" class="score-chip" data-for="e-bb" data-val="3" onclick="setScore('e-bb',3)">3</button><button type="button" class="score-chip" data-for="e-bb" data-val="4" onclick="setScore('e-bb',4)">4</button><button type="button" class="score-chip" data-for="e-bb" data-val="5" onclick="setScore('e-bb',5)">5</button><button type="button" class="score-chip" data-for="e-bb" data-val="6" onclick="setScore('e-bb',6)">6</button><button type="button" class="score-chip" data-for="e-bb" data-val="7" onclick="setScore('e-bb',7)">7</button><button type="button" class="score-chip" data-for="e-bb" data-val="8" onclick="setScore('e-bb',8)">8</button><button type="button" class="score-chip" data-for="e-bb" data-val="9" onclick="setScore('e-bb',9)">9</button><button type="button" class="score-chip" data-for="e-bb" data-val="10" onclick="setScore('e-bb',10)">10</button></div>
             </div>
@@ -307,9 +306,7 @@
             <div class="form-section"><label class="form-label">Joueur</label><select id="e-1a" class="form-select"></select></div>
             <div class="form-section"><label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('e-1ba',-1)">−</button>
                 <input type="number" id="e-1ba" min="0" max="20" class="score-input">
-                <button class="score-btn" onclick="adjustScore('e-1ba',1)">+</button>
               </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="e-1ba" data-val="0" onclick="setScore('e-1ba',0)">0</button><button type="button" class="score-chip" data-for="e-1ba" data-val="1" onclick="setScore('e-1ba',1)">1</button><button type="button" class="score-chip" data-for="e-1ba" data-val="2" onclick="setScore('e-1ba',2)">2</button><button type="button" class="score-chip" data-for="e-1ba" data-val="3" onclick="setScore('e-1ba',3)">3</button><button type="button" class="score-chip" data-for="e-1ba" data-val="4" onclick="setScore('e-1ba',4)">4</button><button type="button" class="score-chip" data-for="e-1ba" data-val="5" onclick="setScore('e-1ba',5)">5</button><button type="button" class="score-chip" data-for="e-1ba" data-val="6" onclick="setScore('e-1ba',6)">6</button><button type="button" class="score-chip" data-for="e-1ba" data-val="7" onclick="setScore('e-1ba',7)">7</button><button type="button" class="score-chip" data-for="e-1ba" data-val="8" onclick="setScore('e-1ba',8)">8</button><button type="button" class="score-chip" data-for="e-1ba" data-val="9" onclick="setScore('e-1ba',9)">9</button><button type="button" class="score-chip" data-for="e-1ba" data-val="10" onclick="setScore('e-1ba',10)">10</button></div>
             </div>
@@ -320,9 +317,7 @@
             <div class="form-section"><label class="form-label">Joueur</label><select id="e-1b" class="form-select"></select></div>
             <div class="form-section"><label class="form-label">Buts</label>
               <div class="score-input-row">
-                <button class="score-btn" onclick="adjustScore('e-1bb',-1)">−</button>
                 <input type="number" id="e-1bb" min="0" max="20" class="score-input">
-                <button class="score-btn" onclick="adjustScore('e-1bb',1)">+</button>
               </div>
                 <div class=\"score-chips\"><button type="button" class="score-chip" data-for="e-1bb" data-val="0" onclick="setScore('e-1bb',0)">0</button><button type="button" class="score-chip" data-for="e-1bb" data-val="1" onclick="setScore('e-1bb',1)">1</button><button type="button" class="score-chip" data-for="e-1bb" data-val="2" onclick="setScore('e-1bb',2)">2</button><button type="button" class="score-chip" data-for="e-1bb" data-val="3" onclick="setScore('e-1bb',3)">3</button><button type="button" class="score-chip" data-for="e-1bb" data-val="4" onclick="setScore('e-1bb',4)">4</button><button type="button" class="score-chip" data-for="e-1bb" data-val="5" onclick="setScore('e-1bb',5)">5</button><button type="button" class="score-chip" data-for="e-1bb" data-val="6" onclick="setScore('e-1bb',6)">6</button><button type="button" class="score-chip" data-for="e-1bb" data-val="7" onclick="setScore('e-1bb',7)">7</button><button type="button" class="score-chip" data-for="e-1bb" data-val="8" onclick="setScore('e-1bb',8)">8</button><button type="button" class="score-chip" data-for="e-1bb" data-val="9" onclick="setScore('e-1bb',9)">9</button><button type="button" class="score-chip" data-for="e-1bb" data-val="10" onclick="setScore('e-1bb',10)">10</button></div>
             </div>
@@ -338,6 +333,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=97"></script>
+  <script src="app.js?v=98"></script>
 </body>
 </html>
