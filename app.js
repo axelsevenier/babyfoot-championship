@@ -379,6 +379,7 @@ function renderSaisie() {
   const dateEl = document.getElementById('s-date');
   if (!dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
   showSuggestInfo('');
+  loadPresence();
   updateWinnerPreview();
 }
 
@@ -429,12 +430,58 @@ function showSuggestInfo(txt) {
   el.style.display = txt ? 'block' : 'none';
 }
 
-// Index de rotation des suggestions (réinitialisé quand le contexte change)
-let suggestIdx = 0;
+// ─── Présents du jour ─────────────────────────────────────────────────────────
+let absentsJour = { date: null, list: [] };
+
+function currentJour() {
+  return document.getElementById('s-date')?.value || new Date().toISOString().split('T')[0];
+}
+
+async function loadPresence() {
+  const jour = currentJour();
+  try {
+    const raw = await fbGet(`/absents/${jour}`);
+    absentsJour = { date: jour, list: Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw || {}) };
+  } catch (e) {
+    absentsJour = { date: jour, list: [] };
+  }
+  renderPresence();
+}
+window.loadPresence = loadPresence;
+
+function renderPresence() {
+  const el = document.getElementById('presence-chips');
+  if (!el) return;
+  const joueurs = S().joueurs.filter(j => !paused.includes(j));
+  el.innerHTML = joueurs.map(j => {
+    const present = !absentsJour.list.includes(j);
+    return `<button type="button" class="presence-chip ${present ? 'active' : ''}" onclick="togglePresence('${j}')">${present ? '✓ ' : ''}${j}</button>`;
+  }).join('');
+  const nb = joueurs.filter(j => !absentsJour.list.includes(j)).length;
+  const cnt = document.getElementById('presence-count');
+  if (cnt) cnt.textContent = `${nb} présent${nb > 1 ? 's' : ''} sur ${joueurs.length}`;
+}
+
+async function togglePresence(j) {
+  const jour = currentJour();
+  if (absentsJour.date !== jour) await loadPresence();
+  absentsJour.list = absentsJour.list.includes(j)
+    ? absentsJour.list.filter(x => x !== j)
+    : [...absentsJour.list, j];
+  renderPresence();
+  showSuggestInfo('');
+  await fbSet(`/absents/${jour}`, absentsJour.list);
+}
+window.togglePresence = togglePresence;
+
+// Index de la proposition affichée (-1 = aucune encore, réinitialisé quand le contexte change)
+let suggestIdx = -1;
 let suggestKey = '';
 
-function suggestMatch() {
-  const actifs = S().joueurs.filter(j => !paused.includes(j));
+async function suggestMatch(dir = 1) {
+  if (absentsJour.date !== currentJour()) await loadPresence();
+  // Joueurs proposables : ni en pause, ni absents aujourd'hui
+  const actifs = S().joueurs.filter(j => !paused.includes(j) && !absentsJour.list.includes(j));
   // Équilibrage basé sur le mois sélectionné dans le formulaire de saisie
   const moisCible = parseInt(document.getElementById('s-mois')?.value ?? new Date().getMonth());
   const matchsMois = S().matchs.filter(m => m.mois === moisCible);
@@ -448,10 +495,12 @@ function suggestMatch() {
 
   // Si le contexte change (mode, mois, jour, joueurs, nb matchs), on repart de la proposition n°1
   const key = `${currentMode}|${moisCible}|${jour}|${actifs.join(',')}|${matchsMois.length}|${matchsJour.length}`;
-  if (key !== suggestKey) { suggestKey = key; suggestIdx = 0; }
+  if (key !== suggestKey) { suggestKey = key; suggestIdx = -1; }
+  // Navigation : 1er clic = proposition n°1, puis ◀ / ▶ pour reculer ou avancer
+  const nav = (n) => { suggestIdx = suggestIdx < 0 ? 0 : (suggestIdx + dir + n) % n; return suggestIdx; };
 
   if (currentMode === '2v2') {
-    if (actifs.length < 4) { alert('Il faut au moins 4 joueurs actifs (hors pause).'); return; }
+    if (actifs.length < 4) { alert('Il faut au moins 4 joueurs présents (hors pause) pour proposer un match.'); return; }
     // Énumérer toutes les répartitions possibles et les classer par priorité
     const options = [];
     for (let a = 0; a < actifs.length; a++)
@@ -486,9 +535,8 @@ function suggestMatch() {
       });
     }
     options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.score - y.score || x.maxRepeat - y.maxRepeat || y.newPairs - x.newPairs);
-    const pick = options[suggestIdx % options.length];
-    const rank = (suggestIdx % options.length) + 1;
-    suggestIdx++;
+    const pick = options[nav(options.length)];
+    const rank = suggestIdx + 1;
     document.getElementById('s-a1').value = pick.tA[0];
     document.getElementById('s-a2').value = pick.tA[1];
     document.getElementById('s-b1').value = pick.tB[0];
@@ -497,7 +545,7 @@ function suggestMatch() {
     showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6
 Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}${repos.length ? ` — au repos : ${repos.join(', ')}` : ''}`);
   } else {
-    if (actifs.length < 2) { alert('Il faut au moins 2 joueurs actifs (hors pause).'); return; }
+    if (actifs.length < 2) { alert('Il faut au moins 2 joueurs présents (hors pause) pour proposer un match.'); return; }
     const options = [];
     for (let i = 0; i < actifs.length; i++)
     for (let k = i+1; k < actifs.length; k++) {
@@ -506,9 +554,8 @@ Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}
       options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax });
     }
     options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
-    const pick = options[suggestIdx % options.length];
-    const rank = (suggestIdx % options.length) + 1;
-    suggestIdx++;
+    const pick = options[nav(options.length)];
+    const rank = suggestIdx + 1;
     document.getElementById('s-1a').value = pick.j1;
     document.getElementById('s-1b').value = pick.j2;
     showSuggestInfo(`Proposition ${rank}/${options.length} · ${pick.j1} vs ${pick.j2} : ${pick.n} confrontation(s) ce mois
@@ -1177,6 +1224,7 @@ async function togglePause(nom) {
   else paused.push(nom);
   await fbSet('/paused', paused);
   renderJoueurs();
+  renderPresence();
 }
 window.togglePause = togglePause;
 
