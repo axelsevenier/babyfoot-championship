@@ -494,6 +494,16 @@ async function suggestMatch(dir = 1) {
     nbJour[j] = matchsJour.filter(m => joue(m, j)).length;
     nbMois[j] = matchsMois.filter(m => joue(m, j)).length;
   });
+  // Garantie « tout le monde joue » : personne n'attend plus d'un tour complet.
+  // Un tour = nb de matchs pour que chaque présent puisse jouer une fois (2v2 : présents / 4, 1v1 : présents / 2).
+  const attente = {};
+  actifs.forEach(j => {
+    let n = 0;
+    for (let i = matchsJour.length - 1; i >= 0 && !joue(matchsJour[i], j); i--) n++;
+    attente[j] = n;
+  });
+  const tour = Math.max(1, Math.ceil(actifs.length / (currentMode === '1v1' ? 2 : 4)));
+  const doitJouer = actifs.filter(j => attente[j] >= tour);
 
   // Si le contexte change (mode, mois, jour, joueurs, nb matchs), on repart de la proposition n°1
   const key = `${currentMode}|${moisCible}|${jour}|${actifs.join(',')}|${matchsMois.length}|${matchsJour.length}`;
@@ -535,21 +545,30 @@ async function suggestMatch(dir = 1) {
         const dayMax = Math.max(...quad.map(j => nbJour[j]));
         // Retard sur le mois : on fait jouer en priorité ceux qui ont le moins de matchs ce mois-ci
         const monthLoad = quad.reduce((s, j) => s + nbMois[j], 0);
+        // Joueurs qui ont attendu un tour complet et qui seraient encore laissés de côté
+        const oublies = doitJouer.filter(j => !quad.includes(j)).length;
+        const attenteQuad = quad.reduce((s, j) => s + attente[j], 0);
+        // Ne pas mettre ensemble les joueurs qui ont le plus d'avance : écart de total du mois entre les 2 équipes
+        const ecartEquipes = Math.abs((nbMois[tA[0]] + nbMois[tA[1]]) - (nbMois[tB[0]] + nbMois[tB[1]]));
         const duoMax = Math.max(...duos);
         const oppMax = Math.max(...opps);
-        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps, dayLoad, dayMax, monthLoad, duoMax, duoSum, oppMax, oppSum });
+        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps, dayLoad, dayMax, monthLoad, duoMax, duoSum, oppMax, oppSum, oublies, attenteQuad, ecartEquipes });
       });
     }
     // Ordre de priorité :
+    //  0. personne n'attend plus d'un tour complet               (oublies, puis attenteQuad)
     //  1. qui est en retard sur le mois (matchs du jour inclus)  (monthLoad)
     //  2. à égalité, qui a le moins joué aujourd'hui              (dayLoad, puis dayMax)
     //  3. le duo le moins formé ce mois                            (duoMax, puis duoSum)
+    //     puis ne pas associer les joueurs qui ont le plus d'avance (ecartEquipes)
     //  4. les adversaires les moins affrontés                      (oppMax, puis oppSum)
     //  5. le plus d'associations inédites                          (newPairs)
     options.sort((x, y) =>
+      x.oublies - y.oublies || (x.oublies > 0 ? y.attenteQuad - x.attenteQuad : 0) ||
       x.monthLoad - y.monthLoad ||
       x.dayLoad - y.dayLoad || x.dayMax - y.dayMax ||
       x.duoMax - y.duoMax || x.duoSum - y.duoSum ||
+      x.ecartEquipes - y.ecartEquipes ||
       x.oppMax - y.oppMax || x.oppSum - y.oppSum ||
       y.newPairs - x.newPairs);
     const pick = options[nav(options.length)];
@@ -561,7 +580,8 @@ async function suggestMatch(dir = 1) {
     const repos = actifs.filter(j => ![...pick.tA, ...pick.tB].includes(j));
     showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6
 Aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}${repos.length ? ` — au repos : ${repos.join(', ')}` : ''}
-Ce mois : ${actifs.map(j => `${j} ${nbMois[j]}`).join(' · ')}`);
+Ce mois : ${actifs.map(j => `${j} ${nbMois[j]}`).join(' · ')}${doitJouer.length ? `
+Prioritaires (ont attendu ${tour} match${tour > 1 ? 's' : ''}) : ${doitJouer.join(', ')}` : ''}`);
   } else {
     if (actifs.length < 2) { alert('Il faut au moins 2 joueurs présents (hors pause) pour proposer un match.'); return; }
     const options = [];
@@ -570,9 +590,10 @@ Ce mois : ${actifs.map(j => `${j} ${nbMois[j]}`).join(' · ')}`);
       const dayLoad = nbJour[actifs[i]] + nbJour[actifs[k]];
       const dayMax = Math.max(nbJour[actifs[i]], nbJour[actifs[k]]);
       const monthLoad = nbMois[actifs[i]] + nbMois[actifs[k]];
-      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax, monthLoad });
+      const oublies = doitJouer.filter(j => j !== actifs[i] && j !== actifs[k]).length;
+      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax, monthLoad, oublies });
     }
-    options.sort((x, y) => x.monthLoad - y.monthLoad || x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
+    options.sort((x, y) => x.oublies - y.oublies || x.monthLoad - y.monthLoad || x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
     const pick = options[nav(options.length)];
     const rank = suggestIdx + 1;
     document.getElementById('s-1a').value = pick.j1;
