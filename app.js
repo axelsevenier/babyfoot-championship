@@ -488,9 +488,11 @@ async function suggestMatch(dir = 1) {
   // Équilibrage du nombre de matchs par joueur sur la journée (date du formulaire)
   const jour = document.getElementById('s-date')?.value || new Date().toISOString().split('T')[0];
   const matchsJour = S().matchs.filter(m => m.date === jour);
-  const nbJour = {};
+  const nbJour = {}, nbMois = {};
+  const joue = (m, j) => (currentMode === '1v1' ? [m.a1, m.b1] : [m.a1, m.a2, m.b1, m.b2]).includes(j);
   actifs.forEach(j => {
-    nbJour[j] = matchsJour.filter(m => (currentMode === '1v1' ? [m.a1, m.b1] : [m.a1, m.a2, m.b1, m.b2]).includes(j)).length;
+    nbJour[j] = matchsJour.filter(m => joue(m, j)).length;
+    nbMois[j] = matchsMois.filter(m => joue(m, j)).length;
   });
 
   // Si le contexte change (mode, mois, jour, joueurs, nb matchs), on repart de la proposition n°1
@@ -531,10 +533,25 @@ async function suggestMatch(dir = 1) {
         // Charge du jour : on fait jouer en priorité ceux qui ont le moins joué aujourd'hui
         const dayLoad = quad.reduce((s, j) => s + nbJour[j], 0);
         const dayMax = Math.max(...quad.map(j => nbJour[j]));
-        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps, dayLoad, dayMax });
+        // Retard sur le mois : on fait jouer en priorité ceux qui ont le moins de matchs ce mois-ci
+        const monthLoad = quad.reduce((s, j) => s + nbMois[j], 0);
+        const duoMax = Math.max(...duos);
+        const oppMax = Math.max(...opps);
+        options.push({ tA, tB, score, maxRepeat, newPairs, duos, opps, dayLoad, dayMax, monthLoad, duoMax, duoSum, oppMax, oppSum });
       });
     }
-    options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.score - y.score || x.maxRepeat - y.maxRepeat || y.newPairs - x.newPairs);
+    // Ordre de priorité :
+    //  1. qui est en retard sur le mois (matchs du jour inclus)  (monthLoad)
+    //  2. à égalité, qui a le moins joué aujourd'hui              (dayLoad, puis dayMax)
+    //  3. le duo le moins formé ce mois                            (duoMax, puis duoSum)
+    //  4. les adversaires les moins affrontés                      (oppMax, puis oppSum)
+    //  5. le plus d'associations inédites                          (newPairs)
+    options.sort((x, y) =>
+      x.monthLoad - y.monthLoad ||
+      x.dayLoad - y.dayLoad || x.dayMax - y.dayMax ||
+      x.duoMax - y.duoMax || x.duoSum - y.duoSum ||
+      x.oppMax - y.oppMax || x.oppSum - y.oppSum ||
+      y.newPairs - x.newPairs);
     const pick = options[nav(options.length)];
     const rank = suggestIdx + 1;
     document.getElementById('s-a1').value = pick.tA[0];
@@ -543,7 +560,8 @@ async function suggestMatch(dir = 1) {
     document.getElementById('s-b2').value = pick.tB[1];
     const repos = actifs.filter(j => ![...pick.tA, ...pick.tB].includes(j));
     showSuggestInfo(`Proposition ${rank}/${options.length} · ce mois : ${pick.tA[0]} & ${pick.tA[1]} ensemble ${pick.duos[0]}×, ${pick.tB[0]} & ${pick.tB[1]} ensemble ${pick.duos[1]}× · ${pick.newPairs} nouvelle(s) association(s) sur 6
-Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}${repos.length ? ` — au repos : ${repos.join(', ')}` : ''}`);
+Aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}${repos.length ? ` — au repos : ${repos.join(', ')}` : ''}
+Ce mois : ${actifs.map(j => `${j} ${nbMois[j]}`).join(' · ')}`);
   } else {
     if (actifs.length < 2) { alert('Il faut au moins 2 joueurs présents (hors pause) pour proposer un match.'); return; }
     const options = [];
@@ -551,15 +569,17 @@ Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}
     for (let k = i+1; k < actifs.length; k++) {
       const dayLoad = nbJour[actifs[i]] + nbJour[actifs[k]];
       const dayMax = Math.max(nbJour[actifs[i]], nbJour[actifs[k]]);
-      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax });
+      const monthLoad = nbMois[actifs[i]] + nbMois[actifs[k]];
+      options.push({ j1: actifs[i], j2: actifs[k], n: confrontCount(matchsMois, actifs[i], actifs[k]), dayLoad, dayMax, monthLoad });
     }
-    options.sort((x, y) => x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
+    options.sort((x, y) => x.monthLoad - y.monthLoad || x.dayLoad - y.dayLoad || x.dayMax - y.dayMax || x.n - y.n);
     const pick = options[nav(options.length)];
     const rank = suggestIdx + 1;
     document.getElementById('s-1a').value = pick.j1;
     document.getElementById('s-1b').value = pick.j2;
     showSuggestInfo(`Proposition ${rank}/${options.length} · ${pick.j1} vs ${pick.j2} : ${pick.n} confrontation(s) ce mois
-Matchs joués aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}`);
+Aujourd'hui : ${actifs.map(j => `${j} ${nbJour[j]}`).join(' · ')}
+Ce mois : ${actifs.map(j => `${j} ${nbMois[j]}`).join(' · ')}`);
   }
   updateWinnerPreview();
 }
