@@ -269,6 +269,50 @@ function getRankEvolution(matchs, joueurs) {
   return evo;
 }
 
+// Seuil de classement (en % des matchs du joueur médian), réglable dans l'onglet Mois, mémorisé sur l'appareil
+let seuilPourcent = 50;
+try { const s = parseInt(localStorage.getItem('bf_seuil_pct')); if (!isNaN(s)) seuilPourcent = s; } catch (e) {}
+
+function seuilDynamique(matchs, pourcent) {
+  const joueursM = [...new Set(matchs.flatMap(m => m.a2 ? [m.a1, m.a2, m.b1, m.b2] : [m.a1, m.b1]))];
+  if (!joueursM.length) return { seuil: 3, mediane: 0 };
+  const n = joueursM.map(j => calcStats(matchs, j).matchs).sort((a, b) => a - b);
+  const mi = Math.floor(n.length / 2);
+  const mediane = n.length % 2 ? n[mi] : (n[mi - 1] + n[mi]) / 2;
+  return { seuil: Math.max(3, Math.ceil(pourcent / 100 * mediane)), mediane };
+}
+
+function matchsAvantDernierJour(matchs) {
+  const dates = matchs.map(m => m.date).filter(Boolean).sort();
+  if (dates.length) return matchs.filter(m => m.date !== dates[dates.length - 1]);
+  return matchs.slice(0, Math.max(0, matchs.length - 5));
+}
+
+// Évolution du rang depuis le dernier jour joué, UNIQUEMENT parmi les joueurs classés (au-dessus du seuil).
+// seuilDe(matchs) donne le seuil à appliquer sur un ensemble de matchs. Un joueur qui vient d'entrer dans le haut du tableau = ▲.
+function evolutionClasses(matchs, joueurs, seuilDe) {
+  const cur = defaultRanking(matchs, joueurs, seuilDe(matchs)).map(r => r.j);
+  const prevM = matchsAvantDernierJour(matchs);
+  if (!prevM.length) return {};
+  const prev = defaultRanking(prevM, joueurs, seuilDe(prevM)).map(r => r.j);
+  if (!prev.length) return {};
+  const evo = {};
+  cur.forEach((j, i) => {
+    const k = prev.indexOf(j);
+    evo[j] = k === -1 ? 1 : k - i;
+  });
+  return evo;
+}
+
+function setSeuilPourcent(v) {
+  const n = Math.max(0, Math.min(100, parseInt(v)));
+  if (isNaN(n)) return;
+  seuilPourcent = n;
+  try { localStorage.setItem('bf_seuil_pct', String(n)); } catch (e) {}
+  renderMensuel(activeMois);
+}
+window.setSeuilPourcent = setSeuilPourcent;
+
 function sortedRanking(matchs, joueurs, minMatchs = 0) {
   return joueurs
     .map(j => ({ j, ...calcStats(matchs, j) }))
@@ -334,13 +378,14 @@ function renderGeneral() {
   ).join('');
   animateCounters();
 
-  const evo = getRankEvolution(S().matchs, S().joueurs);
+  const evo = evolutionClasses(S().matchs, S().joueurs, () => SEUIL_GEN);
   document.getElementById('tbody-general').innerHTML = rows.map((r, i) => {
-    const medal = i < 3 ? medals[i] : (i + 1);
+    const estClasse = i < qualifies.length;
+    const medal = (estClasse && i < 3) ? medals[i] : (i + 1);
     const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
     const diffStr = r.diff > 0 ? '+' + r.diff : r.diff;
     const e = evo[r.j] || 0;
-    const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:11px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:11px">▼</span>' : '<span style="color:var(--gray-300);font-size:11px">–</span>';
+    const evoIcon = !estClasse ? '' : e > 0 ? '<span style="color:#16a34a;font-size:11px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:11px">▼</span>' : '<span style="color:var(--gray-300);font-size:11px">–</span>';
     const streak = getStreak(S().matchs, r.j);
     const streakBadge = streak >= 3 ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600">🔥${streak}</span>` : '';
     const divider = (i === qualifies.length && nonQualifies.length)
@@ -683,25 +728,33 @@ function renderMensuel(mois) {
   const content = document.getElementById('mensuel-content');
   if (!matchsMois.length) {
     const subLabel0 = document.getElementById('mensuel-sub');
-    if (subLabel0) subLabel0.textContent = 'Min. 7 matchs pour être classé';
+    if (subLabel0) subLabel0.textContent = `Seuil : ${seuilPourcent} % des matchs du joueur médian du mois (3 minimum)`;
     content.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Aucun match en ${MOIS_NOMS[activeMois]}.</p></div>`;
     return;
   }
 
-  const SEUIL_MOIS = 7;
+  // Seuil dynamique : X % du nombre de matchs du joueur médian du mois, arrondi au supérieur, 3 minimum
   const joueursMoisAll = [...new Set(matchsMois.flatMap(m => currentMode === '1v1' ? [m.a1,m.b1] : [m.a1,m.a2,m.b1,m.b2]))];
-  const nbQualifies = joueursMoisAll.filter(j => calcStats(matchsMois, j).matchs >= SEUIL_MOIS).length;
-  const seuilActif = nbQualifies >= 5;
+  const { seuil: SEUIL_MOIS, mediane } = seuilDynamique(matchsMois, seuilPourcent);
   const subLabel = document.getElementById('mensuel-sub');
-  if (subLabel) subLabel.textContent = seuilActif
-    ? `Min. ${SEUIL_MOIS} matchs pour être classé dans le haut du tableau`
-    : `Classement provisoire (seuil de ${SEUIL_MOIS} matchs pas encore atteint par 5 joueurs)`;
+  if (subLabel) subLabel.textContent =
+    `Seuil actuel : ${SEUIL_MOIS} matchs (${seuilPourcent} % de la médiane du mois, ${String(mediane).replace('.', ',')} matchs)`;
+  const inputPct = document.getElementById('seuil-pct');
+  if (inputPct && document.activeElement !== inputPct) inputPct.value = seuilPourcent;
+  const seuilRes = document.getElementById('seuil-result');
+  if (seuilRes) seuilRes.textContent = `→ ${SEUIL_MOIS} matchs minimum`;
 
-  const qualifies = seuilActif ? sortedRanking(matchsMois, S().joueurs, SEUIL_MOIS) : sortedRanking(matchsMois, S().joueurs, 0);
-  const nonQualifies = seuilActif ? S().joueurs
+  let qualifies = sortedRanking(matchsMois, S().joueurs, SEUIL_MOIS);
+  let nonQualifies = S().joueurs
     .map(j => ({ j, ...calcStats(matchsMois, j) }))
     .filter(r => r.matchs > 0 && r.matchs < SEUIL_MOIS)
-    .sort((a, b) => b.v - a.v || b.ratio - a.ratio || b.diff - a.diff) : [];
+    .sort((a, b) => b.v - a.v || b.ratio - a.ratio || b.diff - a.diff);
+  // Tout début de mois : personne n'a encore atteint le seuil → classement provisoire de tout le monde
+  if (!qualifies.length) {
+    qualifies = sortedRanking(matchsMois, S().joueurs, 1);
+    nonQualifies = [];
+    if (subLabel) subLabel.textContent = `Classement provisoire : personne n'a encore ${SEUIL_MOIS} matchs`;
+  }
   const ranked = [...qualifies, ...nonQualifies];
   const medals = ['🥇','🥈','🥉'];
   const joueursMois = joueursMoisAll;
@@ -715,16 +768,22 @@ function renderMensuel(mois) {
     <div class="card">
       <table class="ranking-table"><thead><tr><th class="col-rank">Rang</th><th>Joueur</th><th class="col-num">V</th><th class="col-num">D</th><th class="col-num">Matchs</th><th class="col-num">Diff.</th><th class="col-num">Ratio</th></tr></thead>
       <tbody>
-        ${(() => { const evoM = getRankEvolution(matchsMois, S().joueurs); return ranked.map((r, i) => {
-          const medal = i < 3 ? medals[i] : (i+1);
+        ${(() => {
+          const seuilDe = m => { const s = seuilDynamique(m, seuilPourcent).seuil; return defaultRanking(m, S().joueurs, s).length ? s : 1; };
+          const evoM = evolutionClasses(matchsMois, S().joueurs, seuilDe);
+          return ranked.map((r, i) => {
+          const estClasse = i < qualifies.length;
+          const medal = (estClasse && i < 3) ? medals[i] : (i+1);
           const diffClass = r.diff > 0 ? 'diff-pos' : r.diff < 0 ? 'diff-neg' : '';
           const diffStr = r.diff > 0 ? '+'+r.diff : r.diff;
           const e = evoM[r.j] || 0;
-          const evoIcon = e > 0 ? '<span style="color:#16a34a;font-size:10px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:10px">▼</span>' : '';
+          const evoIcon = !estClasse ? '' : e > 0 ? '<span style="color:#16a34a;font-size:10px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:10px">▼</span>' : '';
+          const streakM = getStreak(matchsMois, r.j);
+          const flamme = streakM >= 5 ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600">🔥${streakM}</span>` : '';
           const divider = (i === qualifies.length && nonQualifies.length)
             ? `<tr><td colspan="7" style="font-size:11px;color:var(--text-soft);padding:8px 12px;background:var(--surface-2);border-top:1px dashed var(--border);font-weight:600">Moins de ${SEUIL_MOIS} matchs joués — classés par nombre de victoires</td></tr>`
             : '';
-          return `${divider}<tr><td class="col-rank">${medal}${evoIcon}</td><td style="font-weight:600">${r.j}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
+          return `${divider}<tr><td class="col-rank">${medal}${evoIcon}</td><td style="font-weight:600">${r.j}${flamme}</td><td class="col-num">${r.v}</td><td class="col-num">${r.d}</td><td class="col-num">${r.matchs}</td><td class="col-num ${diffClass}">${diffStr}</td><td class="col-num" style="font-weight:600">${r.ratio}%</td></tr>`;
         }).join(''); })()}
       </tbody></table>
     </div>`;
