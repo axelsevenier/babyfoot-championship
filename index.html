@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=102">
+  <link rel="stylesheet" href="style.css?v=104">
 </head>
 <body>
 
@@ -212,8 +212,14 @@
 
     <!-- PAGE MENSUEL -->
     <section id="page-mensuel" class="page active">
-      <div class="page-header"><h2>Classements mensuels</h2><span class="page-sub" id="mensuel-sub">Min. 7 matchs pour être classé</span></div>
+      <div class="page-header"><h2>Classements mensuels</h2><span class="page-sub" id="mensuel-sub">Seuil : % des matchs du joueur médian du mois</span></div>
       <div class="month-pills" id="month-pills"></div>
+      <div class="seuil-control">
+        <label for="seuil-pct">Seuil de classement</label>
+        <input type="number" id="seuil-pct" min="0" max="100" step="5" inputmode="numeric" onchange="setSeuilPourcent(this.value)">
+        <span>% des matchs du joueur médian</span>
+        <strong id="seuil-result"></strong>
+      </div>
       <div id="mensuel-content"></div>
     </section>
 
@@ -333,6 +339,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=102"></script>
+  <script src="app.js?v=104"></script>
 </body>
 </html>
