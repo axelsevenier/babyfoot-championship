@@ -1000,3 +1000,33 @@ main {
 .suggest-arrow { width: 46px; flex-shrink: 0; font-size: 13px; }
 .suggest-main:hover, .suggest-arrow:hover { background: rgba(200,16,46,.12); }
 .suggest-main:active, .suggest-arrow:active { transform: scale(.97); }
+
+/* ─── Réglage du seuil (onglet Mois) ────────────────────────────── */
+.seuil-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.seuil-control label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-soft); }
+.seuil-control input {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 18px;
+  text-align: center;
+}
+.seuil-control input:focus { outline: none; border-color: var(--bonzini-red); box-shadow: 0 0 0 3px rgba(200,16,46,.13); }
+.seuil-control strong { color: var(--bonzini-red); font-weight: 700; }
