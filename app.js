@@ -98,6 +98,7 @@ async function initFirebase() {
     }
 
     // Charger les joueurs en pause
+    try { seuilsParMois = (await fbGet('/seuils')) || {}; } catch (e) { seuilsParMois = {}; }
     const pausedRaw = await fbGet('/paused');
     paused = Array.isArray(pausedRaw) ? pausedRaw : Object.values(pausedRaw || {});
 
@@ -107,6 +108,7 @@ async function initFirebase() {
 
     // Écoute temps réel pour les deux modes
     fbListen('/paused', (d) => { paused = Array.isArray(d) ? d : Object.values(d || {}); });
+    fbListen('/seuils', () => reloadSeuils());
     fbListen('/2v2/matchs', () => reloadMatchs('2v2', true));
     fbListen('/1v1/matchs', () => reloadMatchs('1v1', true));
     fbListen('/2v2/joueurs', () => reloadJoueurs('2v2'));
@@ -270,8 +272,22 @@ function getRankEvolution(matchs, joueurs) {
 }
 
 // Seuil de classement (en % des matchs du joueur médian), réglable dans l'onglet Mois, mémorisé sur l'appareil
-let seuilPourcent = 50;
-try { const s = parseInt(localStorage.getItem('bf_seuil_pct')); if (!isNaN(s)) seuilPourcent = s; } catch (e) {}
+// Un pourcentage par mois (et par mode 2v2 / 1v1), 50 % par défaut.
+// Stocké dans Firebase (/seuils) : le même réglage s'applique à tout le monde.
+const SEUIL_PCT_DEFAUT = 50;
+let seuilsParMois = {};
+const cleSeuil = mois => `${currentMode}_m${mois}`;
+function getSeuilPct(mois) {
+  const v = seuilsParMois[cleSeuil(mois)];
+  return typeof v === 'number' ? v : SEUIL_PCT_DEFAUT;
+}
+
+async function reloadSeuils() {
+  try { seuilsParMois = (await fbGet('/seuils')) || {}; } catch (e) {}
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
+  if (activePage === 'mensuel') renderMensuel(activeMois);
+  if (activePage === 'palmares') renderPalmares();
+}
 
 function seuilDynamique(matchs, pourcent) {
   const joueursM = [...new Set(matchs.flatMap(m => m.a2 ? [m.a1, m.a2, m.b1, m.b2] : [m.a1, m.b1]))];
@@ -304,12 +320,13 @@ function evolutionClasses(matchs, joueurs, seuilDe) {
   return evo;
 }
 
-function setSeuilPourcent(v) {
+async function setSeuilPourcent(v) {
   const n = Math.max(0, Math.min(100, parseInt(v)));
   if (isNaN(n)) return;
-  seuilPourcent = n;
-  try { localStorage.setItem('bf_seuil_pct', String(n)); } catch (e) {}
+  const cle = cleSeuil(activeMois);
+  seuilsParMois[cle] = n;
   renderMensuel(activeMois);
+  try { await fbSet(`/seuils/${cle}`, n); } catch (e) { console.error(e); }
 }
 window.setSeuilPourcent = setSeuilPourcent;
 
@@ -726,6 +743,14 @@ function renderMensuel(mois) {
 
   const matchsMois = S().matchs.filter(m => m.mois === activeMois);
   const content = document.getElementById('mensuel-content');
+  const seuilPourcent = getSeuilPct(activeMois);
+  const inputPct = document.getElementById('seuil-pct');
+  if (inputPct && document.activeElement !== inputPct) inputPct.value = seuilPourcent;
+  const labelPct = document.getElementById('seuil-label');
+  const nomMois = MOIS_NOMS[activeMois].toLowerCase();
+  if (labelPct) labelPct.textContent = `Seuil ${/^[aeiouyàâéèêîôû]/.test(nomMois) ? 'd’' : 'de '}${nomMois}`;
+  const seuilRes0 = document.getElementById('seuil-result');
+  if (seuilRes0) seuilRes0.textContent = '';
   if (!matchsMois.length) {
     const subLabel0 = document.getElementById('mensuel-sub');
     if (subLabel0) subLabel0.textContent = `Seuil : ${seuilPourcent} % des matchs du joueur médian du mois (3 minimum)`;
@@ -739,8 +764,6 @@ function renderMensuel(mois) {
   const subLabel = document.getElementById('mensuel-sub');
   if (subLabel) subLabel.textContent =
     `Seuil actuel : ${SEUIL_MOIS} matchs (${seuilPourcent} % de la médiane du mois, ${String(mediane).replace('.', ',')} matchs)`;
-  const inputPct = document.getElementById('seuil-pct');
-  if (inputPct && document.activeElement !== inputPct) inputPct.value = seuilPourcent;
   const seuilRes = document.getElementById('seuil-result');
   if (seuilRes) seuilRes.textContent = `→ ${SEUIL_MOIS} matchs minimum`;
 
@@ -819,7 +842,9 @@ function renderPalmares() {
 
   const titresHTML = moisAvecData.map(mois => {
     const matchsMois = S().matchs.filter(m => m.mois === mois);
-    const ranked = sortedRanking(matchsMois, S().joueurs, 3);
+    const seuilM = seuilDynamique(matchsMois, getSeuilPct(mois)).seuil;
+    let ranked = defaultRanking(matchsMois, S().joueurs, seuilM);
+    if (!ranked.length) ranked = defaultRanking(matchsMois, S().joueurs, 1);
     if (!ranked.length) return '';
     const winner = ranked[0];
     return `<div class="palmares-month-card">
