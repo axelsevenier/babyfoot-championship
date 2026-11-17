@@ -54,20 +54,56 @@ function S() { return state[currentMode]; }
 function fbPath(path) { return `/${currentMode}${path}`; }
 
 // ─── Firebase ─────────────────────────────────────────────────────────────────
-async function fbGet(path) {
-  const r = await fetch(`${FIREBASE_URL}${path}.json`);
+// Toutes les requêtes ont un délai max (15 s) et lèvent une erreur explicite en cas d'échec
+async function fbRequest(path, options = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  let r;
+  try {
+    r = await fetch(`${FIREBASE_URL}${path}.json`, { ...options, signal: ctrl.signal });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'la base de données ne répond pas (délai dépassé)' : 'connexion impossible à la base de données');
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!r.ok) {
+    let detail = '';
+    try { detail = (await r.json()).error || ''; } catch (e) {}
+    throw new Error(`refus de la base de données (code ${r.status}${detail ? ' : ' + detail : ''})`);
+  }
   return r.json();
 }
-async function fbSet(path, data) {
-  await fetch(`${FIREBASE_URL}${path}.json`, { method: 'PUT', body: JSON.stringify(data) });
+async function fbGet(path) { return fbRequest(path); }
+async function fbSet(path, data) { return fbRequest(path, { method: 'PUT', body: JSON.stringify(data) }); }
+async function fbPush(path, data) { return fbRequest(path, { method: 'POST', body: JSON.stringify(data) }); }
+async function fbDelete(path) { return fbRequest(path, { method: 'DELETE' }); }
+// Écoute temps réel de toute la base sur UNE seule connexion, puis aiguillage selon la partie modifiée.
+// (L'offre gratuite Firebase limite à 100 connexions simultanées : 1 par appareil au lieu de 6.)
+function fbListenAll(handlers) {
+  let premier = true;
+  const pending = new Set();
+  let timer = null;
+  const flush = () => { const keys = [...pending]; pending.clear(); keys.forEach(k => handlers[k] && handlers[k]()); };
+  const onEvent = e => {
+    const d = JSON.parse(e.data);
+    const path = d.path || '/';
+    if (path === '/') {
+      // Envoi complet : à la connexion (déjà chargé) ou après une reconnexion (on recharge tout)
+      if (premier) { premier = false; return; }
+      Object.keys(handlers).forEach(k => pending.add(k));
+    } else {
+      const k = Object.keys(handlers).find(h => path === h || path.startsWith(h + '/'));
+      if (k) pending.add(k);
+    }
+    clearTimeout(timer);
+    timer = setTimeout(flush, 250);
+  };
+  const es = new EventSource(`${FIREBASE_URL}/.json`);
+  es.addEventListener('put', onEvent);
+  es.addEventListener('patch', onEvent);
+  return es;
 }
-async function fbPush(path, data) {
-  const r = await fetch(`${FIREBASE_URL}${path}.json`, { method: 'POST', body: JSON.stringify(data) });
-  return r.json();
-}
-async function fbDelete(path) {
-  await fetch(`${FIREBASE_URL}${path}.json`, { method: 'DELETE' });
-}
+
 function fbListen(path, callback) {
   const es = new EventSource(`${FIREBASE_URL}${path}.json`);
   es.addEventListener('put', e => { const d = JSON.parse(e.data); callback(d.data); });
@@ -107,12 +143,14 @@ async function initFirebase() {
     renderSaisie();
 
     // Écoute temps réel pour les deux modes
-    fbListen('/paused', (d) => { paused = Array.isArray(d) ? d : Object.values(d || {}); });
-    fbListen('/seuils', () => reloadSeuils());
-    fbListen('/2v2/matchs', () => reloadMatchs('2v2', true));
-    fbListen('/1v1/matchs', () => reloadMatchs('1v1', true));
-    fbListen('/2v2/joueurs', () => reloadJoueurs('2v2'));
-    fbListen('/1v1/joueurs', () => reloadJoueurs('1v1'));
+    fbListenAll({
+      '/paused': async () => { try { const d = await fbGet('/paused'); paused = Array.isArray(d) ? d.filter(Boolean) : Object.values(d || {}); } catch (e) {} },
+      '/seuils': () => reloadSeuils().catch(() => {}),
+      '/2v2/matchs': () => reloadMatchs('2v2', true).catch(() => {}),
+      '/1v1/matchs': () => reloadMatchs('1v1', true).catch(() => {}),
+      '/2v2/joueurs': () => reloadJoueurs('2v2').catch(() => {}),
+      '/1v1/joueurs': () => reloadJoueurs('1v1').catch(() => {}),
+    });
   } catch(e) {
     console.error(e);
     showLoading(false);
@@ -717,10 +755,19 @@ async function saveMatch() {
     matchData = { mois, a1, b1, ba, bb, date };
   }
 
-  const btn = document.querySelector('#page-saisie .btn-primary');
+  const btn = document.querySelector('#page-saisie .form-actions .btn-primary');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
-  await fbPush(`/${currentMode}/matchs`, matchData);
-  await reloadMatchs(currentMode, false);
+  msg.textContent = ''; msg.className = 'save-msg';
+  try {
+    await fbPush(`/${currentMode}/matchs`, matchData);
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = 'Enregistrer le match';
+    msg.textContent = `⚠ Match non enregistré : ${e.message}. Vérifie ta connexion puis réessaie (et regarde l'historique pour éviter un doublon).`;
+    msg.className = 'save-msg error';
+    return;
+  }
+  try { await reloadMatchs(currentMode, false); } catch (e) { console.error(e); }
 
   // Reset scores
   if (currentMode === '2v2') { document.getElementById('s-ba').value = 0; document.getElementById('s-bb').value = 0; }
@@ -1142,7 +1189,12 @@ window.renderHistory = renderHistory;
 
 async function deleteMatch(id) {
   if (!confirm('Supprimer ce match ?')) return;
-  await fbDelete(`/${currentMode}/matchs/${id}`);
+  try {
+    await fbDelete(`/${currentMode}/matchs/${id}`);
+  } catch (e) {
+    alert(`Suppression impossible : ${e.message}. Réessaie.`);
+    return;
+  }
   await reloadMatchs(currentMode, false);
 }
 window.deleteMatch = deleteMatch;
@@ -1216,7 +1268,15 @@ async function saveEditMatch() {
 
   const btn = document.getElementById('e-save-btn');
   btn.disabled = true; btn.textContent = 'Enregistrement...';
-  await fbSet(`/${currentMode}/matchs/${editingId}`, matchData);
+  try {
+    await fbSet(`/${currentMode}/matchs/${editingId}`, matchData);
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+    msg.textContent = `⚠ Modification non enregistrée : ${e.message}. Réessaie.`;
+    msg.className = 'save-msg error';
+    return;
+  }
   await reloadMatchs(currentMode, false);
   btn.disabled = false; btn.textContent = 'Enregistrer';
   closeEditModal();
