@@ -273,6 +273,21 @@ function getStreak(matchs, joueur) {
   return streak;
 }
 
+function getLossStreak(matchs, joueur) {
+  let streak = 0;
+  for (let i = matchs.length - 1; i >= 0; i--) {
+    const m = matchs[i];
+    const is1v1 = !m.a2;
+    const inA = is1v1 ? m.a1 === joueur : [m.a1,m.a2].includes(joueur);
+    const inB = is1v1 ? m.b1 === joueur : [m.b1,m.b2].includes(joueur);
+    if (!inA && !inB) continue;
+    const lost = inA ? m.ba < m.bb : m.bb < m.ba;
+    if (lost) streak++;
+    else break;
+  }
+  return streak;
+}
+
 function getMaxStreak(matchs, joueur) {
   let max = 0, cur = 0;
   matchs.forEach(m => {
@@ -347,13 +362,14 @@ function matchsAvantDernierJour(matchs) {
 function evolutionClasses(matchs, joueurs, seuilDe) {
   const cur = defaultRanking(matchs, joueurs, seuilDe(matchs)).map(r => r.j);
   const prevM = matchsAvantDernierJour(matchs);
-  if (!prevM.length) return {};
-  const prev = defaultRanking(prevM, joueurs, seuilDe(prevM)).map(r => r.j);
-  if (!prev.length) return {};
+  if (!prevM.length || !cur.length) return {};
+  // Rang de la veille recalculé UNIQUEMENT entre les joueurs classés aujourd'hui :
+  // un joueur qui entre ou sort du haut du tableau ne fait plus bouger les flèches des autres.
+  const prev = defaultRanking(prevM, cur, 0).map(r => r.j);
   const evo = {};
   cur.forEach((j, i) => {
     const k = prev.indexOf(j);
-    evo[j] = k === -1 ? 1 : k - i;
+    evo[j] = k === -1 ? 0 : k - i;
   });
   return evo;
 }
@@ -849,7 +865,12 @@ function renderMensuel(mois) {
           const e = evoM[r.j] || 0;
           const evoIcon = !estClasse ? '' : e > 0 ? '<span style="color:#16a34a;font-size:10px">▲</span>' : e < 0 ? '<span style="color:#dc2626;font-size:10px">▼</span>' : '';
           const streakM = getStreak(matchsMois, r.j);
-          const flamme = streakM >= 5 ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600">🔥${streakM}</span>` : '';
+          const lossM = getLossStreak(matchsMois, r.j);
+          const flamme = streakM >= 3
+            ? ` <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:100px;font-weight:600" title="${streakM} victoires d’affilée">🔥${streakM}</span>`
+            : lossM >= 3
+              ? ` <span style="font-size:11px;background:#e0f2fe;color:#075985;padding:1px 6px;border-radius:100px;font-weight:600" title="${lossM} défaites d’affilée">❄️${lossM}</span>`
+              : '';
           const divider = (i === qualifies.length && nonQualifies.length)
             ? `<tr><td colspan="7" style="font-size:11px;color:var(--text-soft);padding:8px 12px;background:var(--surface-2);border-top:1px dashed var(--border);font-weight:600">Moins de ${SEUIL_MOIS} matchs joués — classés par nombre de victoires</td></tr>`
             : '';
